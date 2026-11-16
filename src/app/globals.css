@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/*
+  Design tokens. Neutral graphite surfaces, one espresso accent.
+  Spacing sits on a 4px grid; Tailwind's default scale already is one.
+*/
+:root {
+  color-scheme: light dark;
+
+  --bg: light-dark(#fafafa, #141415);
+  --sidebar: light-dark(#f4f4f5, #0f0f10);
+  --card: light-dark(#ffffff, #19191b);
+  --raised: light-dark(#f4f4f5, #232325);
+  --hairline: light-dark(rgb(23 23 23 / 0.1), rgb(237 237 237 / 0.1));
+  --hairline-strong: light-dark(rgb(23 23 23 / 0.2), rgb(237 237 237 / 0.22));
+
+  --text: light-dark(#171717, #ededed);
+  --text-2: light-dark(#525252, #a1a1a6);
+  --text-3: light-dark(#6b6b6b, #85858b);
+
+  --accent: light-dark(#7a4a2b, #d2a679);
+  --accent-ink: light-dark(#ffffff, #1b130d);
+  --accent-soft: light-dark(rgb(122 74 43 / 0.1), rgb(210 166 121 / 0.14));
+
+  --positive: light-dark(#16a34a, #4cc38a);
+  --negative: light-dark(#dc2626, #e5484d);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-sidebar: var(--sidebar);
+  --color-card: var(--card);
+  --color-raised: var(--raised);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-ink: var(--text);
+  --color-ink-2: var(--text-2);
+  --color-ink-3: var(--text-3);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-control: 10px;
+  --radius-card: 16px;
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  /* Follow the OS text size setting. */
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.375;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* One quiet, shared control style. */
+@layer components {
+  .field {
+    display: block;
+    inline-size: 100%;
+    min-block-size: 2.75rem;
+    padding-inline: 0.75rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--hairline-strong);
+    background: var(--card);
+    color: var(--text);
+    transition-property: border-color, background-color;
+    transition-duration: 150ms;
+    transition-timing-function: var(--ease);
+  }
+  .field:hover {
+    border-color: var(--text-3);
+  }
+  .field:user-invalid {
+    border-color: var(--negative);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-block-size: 2.75rem;
+    padding-inline: 1.25rem;
+    border-radius: var(--radius-control);
+    font-weight: 500;
+    cursor: pointer;
+    transition-property: background-color, border-color, opacity, transform;
+    transition-duration: 150ms;
+    transition-timing-function: var(--ease);
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .btn-primary:hover:not(:disabled) {
+    opacity: 0.92;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
