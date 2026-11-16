@@ -247,12 +247,7 @@ dialog[open] {
 }
 
 @media print {
-  @page {
-    size: 80mm auto;
-    margin: 4mm;
-  }
-
-  body * {
+  body:has(#kot-print-slip) * {
     visibility: hidden;
   }
 

@@ -7,6 +7,9 @@ export async function proxy(request: NextRequest) {
   const session = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
   const { pathname } = request.nextUrl;
 
+  if (pathname.startsWith("/bill/")) {
+    return NextResponse.next();
+  }
   if (pathname === "/login") {
     return session
       ? NextResponse.redirect(new URL("/pos", request.url))

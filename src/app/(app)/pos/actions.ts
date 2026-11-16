@@ -5,9 +5,12 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
 import { orderItems, orders, payments } from "@/db/schema";
 import { requireOwner } from "@/lib/auth";
+import { signBillId } from "@/lib/bill-share";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/validators";
 
-export type PlaceOrderResult = { billNo: number } | { error: string };
+export type PlaceOrderResult =
+  | { billNo: number; orderId: string; sig: string }
+  | { error: string };
 
 const istDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata",
@@ -77,7 +80,7 @@ export async function placeOrder(input: CreateOrderInput): Promise<PlaceOrderRes
     });
 
     revalidatePath("/dashboard");
-    return { billNo };
+    return { billNo, orderId: data.id, sig: signBillId(data.id) };
   } catch {
     return { error: "Could not save order. Check connection and try again." };
   }

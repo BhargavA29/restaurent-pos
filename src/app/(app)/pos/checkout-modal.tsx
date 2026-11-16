@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, Printer } from "lucide-react";
+import { Download, ExternalLink, MessageCircle, Printer } from "lucide-react";
 import { useId, useState, useTransition } from "react";
 import { Modal } from "@/components/modal";
 import { CAFE_INSTAGRAM, CAFE_NAME, CAFE_TAGLINE } from "@/lib/brand";
@@ -10,7 +10,12 @@ import {
   type CartLine,
   type OrderType,
 } from "@/lib/cart";
-import { formatRupees } from "@/lib/format";
+import {
+  formatIstDateTime,
+  formatPaymentsSummary,
+  formatRupees,
+  ORDER_TYPE_LABEL,
+} from "@/lib/format";
 import {
   normalizePhoneInput,
   optionalPhoneSchema,
@@ -20,6 +25,8 @@ import {
 import { placeOrder } from "./actions";
 
 export type CompletedOrder = {
+  orderId: string;
+  sig: string;
   billNo: number;
   type: OrderType;
   customerName: string;
@@ -38,29 +45,11 @@ const MODES: { id: PaymentMode; label: string }[] = [
   { id: "card", label: "Card" },
 ];
 
-const MODE_LABEL: Record<PaymentMode, string> = {
-  cash: "Cash",
-  upi: "UPI",
-  card: "Card",
-};
-
-const istTimeFormatter = new Intl.DateTimeFormat("en-IN", {
-  timeZone: "Asia/Kolkata",
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-function formatPaymentsSummary(payments: { mode: PaymentMode; amount: number }[]): string {
-  return payments.map((p) => `${MODE_LABEL[p.mode]} ${formatRupees(p.amount)}`).join(" + ");
-}
-
-function buildWhatsAppBillText(order: CompletedOrder): string {
-  const orderTypeLabel =
-    order.type === "takeaway" ? "Takeaway / Parcel" : "Self-pickup";
+function buildWhatsAppBillText(order: CompletedOrder, billUrl: string): string {
   const lines: string[] = [
     `*${CAFE_NAME}* (${CAFE_INSTAGRAM})`,
-    `Bill #${order.billNo} · ${orderTypeLabel}`,
-    istTimeFormatter.format(new Date(order.placedAtIso)),
+    `Bill #${order.billNo} · ${ORDER_TYPE_LABEL[order.type]}`,
+    formatIstDateTime(order.placedAtIso),
   ];
 
   if (order.customerName) {
@@ -92,6 +81,9 @@ function buildWhatsAppBillText(order: CompletedOrder): string {
   }
   lines.push(`*Total: ${formatRupees(order.total)}*`);
   lines.push(`Paid via ${formatPaymentsSummary(order.payments)}`);
+  lines.push("");
+  lines.push("Digital bill & download (valid 48h):");
+  lines.push(billUrl);
   lines.push("");
   lines.push(CAFE_TAGLINE);
 
@@ -218,6 +210,8 @@ function PaymentStage({
       }
 
       onOrderPlaced({
+        orderId: result.orderId,
+        sig: result.sig,
         billNo: result.billNo,
         type: orderType,
         customerName,
@@ -366,6 +360,10 @@ function ReceiptStage({
   const [waPhone, setWaPhone] = useState(order.customerPhone);
   const [waError, setWaError] = useState<string | null>(null);
 
+  const sigParam = encodeURIComponent(order.sig);
+  const billPath = `/bill/${order.orderId}?s=${sigParam}`;
+  const downloadPath = `/api/bill-image/${order.orderId}?s=${sigParam}&download=1`;
+
   function handleSendWhatsApp() {
     const parsed = optionalPhoneSchema.safeParse(waPhone);
     if (!parsed.success) {
@@ -373,7 +371,8 @@ function ReceiptStage({
       return;
     }
     setWaError(null);
-    const text = buildWhatsAppBillText(order);
+    const billUrl = `${window.location.origin}${billPath}`;
+    const text = buildWhatsAppBillText(order, billUrl);
     const target = parsed.data
       ? `https://wa.me/91${parsed.data}?text=${encodeURIComponent(text)}`
       : `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -401,10 +400,9 @@ function ReceiptStage({
         </div>
         <div className="mt-1 flex flex-wrap justify-between gap-2 text-ink-2">
           <span>
-            Bill #{order.billNo} ·{" "}
-            {order.type === "takeaway" ? "Takeaway" : "Self-pickup"}
+            Bill #{order.billNo} · {ORDER_TYPE_LABEL[order.type]}
           </span>
-          <span>{istTimeFormatter.format(new Date(order.placedAtIso))}</span>
+          <span>{formatIstDateTime(order.placedAtIso)}</span>
         </div>
         {order.customerName ? (
           <p className="mt-1 text-ink-2">Customer: {order.customerName}</p>
@@ -492,6 +490,22 @@ function ReceiptStage({
           <MessageCircle size={18} strokeWidth={1.5} aria-hidden />
           Send bill on WhatsApp
         </button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <a href={downloadPath} download className="btn btn-secondary text-xs sm:text-sm">
+            <Download size={16} strokeWidth={1.5} aria-hidden />
+            Download PNG bill
+          </a>
+          <a
+            href={billPath}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-secondary text-xs sm:text-sm"
+          >
+            <ExternalLink size={16} strokeWidth={1.5} aria-hidden />
+            Open 48h bill link
+          </a>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 border-t border-hairline pt-4">
@@ -564,7 +578,7 @@ export function KotPrintSlip({ order }: { order: CompletedOrder | null }) {
         <p className="mt-0.5 font-bold uppercase">
           {order.type === "takeaway" ? "TAKEAWAY" : "SELF-PICKUP"}
         </p>
-        <p>{istTimeFormatter.format(new Date(order.placedAtIso))}</p>
+        <p>{formatIstDateTime(order.placedAtIso)}</p>
         {order.customerName ? <p>Customer: {order.customerName}</p> : null}
       </div>
 
