@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowRight,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -477,7 +478,16 @@ export function CustomersView({
                         </a>
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        {customer.orderCount}
+                        <Link
+                          href={`/customers/${customer.phone}`}
+                          className="inline-flex min-h-8 items-center gap-1 rounded-control border border-hairline bg-card px-2.5 py-1 text-xs font-medium text-accent-text transition-colors hover:border-accent"
+                        >
+                          <span>
+                            {customer.orderCount}{" "}
+                            {customer.orderCount === 1 ? "order" : "orders"}
+                          </span>
+                          <ArrowRight size={12} strokeWidth={1.75} aria-hidden />
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-ink-2">
                         {formatRupees(avgOrder)}

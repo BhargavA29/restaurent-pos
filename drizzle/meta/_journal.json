@@ -22,6 +22,13 @@
       "when": 1794834200000,
       "tag": "0002_owner_username",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794857078623,
+      "tag": "0003_order_lifecycle_and_indexes",
+      "breakpoints": true
     }
   ]
 }

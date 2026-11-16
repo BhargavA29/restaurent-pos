@@ -1,5 +1,5 @@
 import type { OrderType } from "./cart";
-import type { PaymentMode } from "./validators";
+import type { OrderStatus, PaymentMode } from "./validators";
 
 const rupeeFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0,
@@ -14,6 +14,12 @@ const istDateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
 export const ORDER_TYPE_LABEL: Record<OrderType, string> = {
   takeaway: "Takeaway / Parcel",
   pickup: "Self-pickup",
+};
+
+export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  in_progress: "In-Progress",
+  ready: "Ready",
+  delivered: "Delivered",
 };
 
 const PAYMENT_MODE_LABEL: Record<PaymentMode, string> = {

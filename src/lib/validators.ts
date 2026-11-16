@@ -76,6 +76,12 @@ export const comboSchema = z.object({
 });
 
 export const paymentModeSchema = z.enum(["cash", "upi", "card"]);
+export const orderStatusSchema = z.enum(["in_progress", "ready", "delivered"]);
+
+export const updateOrderStatusSchema = z.object({
+  orderId: uuidSchema,
+  status: orderStatusSchema,
+});
 
 export const orderLineInputSchema = z.object({
   kind: z.enum(["item", "combo"]),
@@ -148,6 +154,7 @@ export type VariantInput = z.infer<typeof variantSchema>;
 export type ItemInput = z.infer<typeof itemSchema>;
 export type ComboInput = z.infer<typeof comboSchema>;
 export type PaymentMode = z.infer<typeof paymentModeSchema>;
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
 export type OrderLineInput = z.infer<typeof orderLineInputSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
