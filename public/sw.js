@@ -1,4 +1,4 @@
-const CACHE_NAME = "fry-pos-v3";
+const CACHE_NAME = "fry-pos-v4";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -26,6 +26,8 @@ self.addEventListener("fetch", (event) => {
   const isStaticAsset =
     url.pathname.startsWith("/_next/static/") ||
     url.pathname === "/icon" ||
+    url.pathname === "/icon-192" ||
+    url.pathname === "/icon-maskable" ||
     url.pathname === "/apple-icon" ||
     url.pathname === "/manifest.webmanifest";
 

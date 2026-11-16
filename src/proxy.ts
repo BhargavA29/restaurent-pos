@@ -11,6 +11,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/bill/") ||
     pathname.startsWith("/b/") ||
     pathname === "/icon" ||
+    pathname === "/icon-192" ||
+    pathname === "/icon-maskable" ||
     pathname === "/apple-icon"
   ) {
     return NextResponse.next();

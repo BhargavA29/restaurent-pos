@@ -1,7 +1,9 @@
-import { Flame, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import { BrandLogo } from "@/components/brand-logo";
 import { Nav } from "@/components/nav";
 import { OfflineSyncBar } from "@/components/offline-sync-bar";
+import { PwaInstallButton } from "@/components/pwa-install-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { requireOwner } from "@/lib/auth";
 import { CAFE_INSTAGRAM, CAFE_NAME } from "@/lib/brand";
@@ -14,9 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Laptop: fixed sidebar. Phone: this same block becomes a bottom tab bar. */}
       <aside className="fixed inset-x-0 bottom-0 z-10 border-t border-hairline bg-sidebar pb-[env(safe-area-inset-bottom)] md:sticky md:inset-auto md:top-0 md:flex md:h-dvh md:flex-col md:border-t-0 md:border-e md:p-4 md:pb-4">
         <div className="mb-6 hidden items-center gap-3 px-3 pt-1 md:flex">
-          <span className="grid size-8 place-items-center rounded-lg bg-accent text-white">
-            <Flame size={16} strokeWidth={1.5} aria-hidden />
-          </span>
+          <BrandLogo size={34} />
           <div className="leading-tight">
             <span className="block text-base font-medium tracking-tight">{CAFE_NAME}</span>
             <span className="block font-mono text-xs text-ink-3">{CAFE_INSTAGRAM}</span>
@@ -29,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
         <div className="mt-auto hidden flex-col gap-1 md:flex">
           <p className="truncate px-3 pb-1 text-xs text-ink-3">{owner.name}</p>
+          <PwaInstallButton />
           <ThemeToggle />
           <form action={logout}>
             <button
@@ -45,9 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="flex min-w-0 flex-col">
         <header className="flex items-center justify-between border-b border-hairline bg-sidebar px-4 py-2.5 md:hidden">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-8 place-items-center rounded-lg bg-accent text-white">
-              <Flame size={16} strokeWidth={1.5} aria-hidden />
-            </span>
+            <BrandLogo size={34} />
             <div className="flex items-baseline gap-2">
               <span className="text-base font-medium tracking-tight">{CAFE_NAME}</span>
               <span className="font-mono text-xs text-ink-3">{CAFE_INSTAGRAM}</span>
@@ -55,6 +54,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-1">
+            <PwaInstallButton compact />
             <ThemeToggle compact />
             <form action={logout}>
               <button

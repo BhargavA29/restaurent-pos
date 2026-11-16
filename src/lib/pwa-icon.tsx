@@ -1,6 +1,10 @@
 import { ImageResponse } from "next/og";
+import { FryMascotSvg } from "@/components/brand-logo";
 
-export function renderBrandIcon(px: number, radius: number, fontSize: number) {
+export function renderBrandIcon(px: number, radius: number, paddingRatio = 0.08) {
+  const pad = Math.round(px * paddingRatio);
+  const mascotPx = px - pad * 2;
+
   return new ImageResponse(
     (
       <div
@@ -10,15 +14,12 @@ export function renderBrandIcon(px: number, radius: number, fontSize: number) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#f73e00",
-          color: "#ffffff",
+          backgroundColor: "#ff6600",
           borderRadius: `${radius}px`,
-          fontSize: `${fontSize}px`,
-          fontWeight: 700,
-          letterSpacing: "-0.04em",
+          padding: `${pad}px`,
         }}
       >
-        FRY
+        <FryMascotSvg size={mascotPx} />
       </div>
     ),
     { width: px, height: px },

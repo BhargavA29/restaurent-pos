@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
+import { FryMascotSvg } from "@/components/brand-logo";
 import { loadSignedOrder } from "@/lib/bill-share";
 import { CAFE_INSTAGRAM, CAFE_NAME, CAFE_TAGLINE } from "@/lib/brand";
 import {
@@ -107,27 +108,16 @@ export async function GET(
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <div
                   style={{
-                    width: "46px",
-                    height: "46px",
+                    width: "48px",
+                    height: "48px",
                     borderRadius: "10px",
-                    backgroundColor: DARK.accent,
+                    backgroundColor: "#ff6600",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#ffffff"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" />
-                  </svg>
+                  <FryMascotSvg size={42} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   <span

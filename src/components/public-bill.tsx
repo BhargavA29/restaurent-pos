@@ -1,6 +1,7 @@
-import { Download, Flame } from "lucide-react";
+import { Download } from "lucide-react";
 import type { Metadata } from "next";
 import { PrintButton } from "@/app/bill/[id]/print-button";
+import { BrandLogo } from "@/components/brand-logo";
 import type { LoadedSignedBill } from "@/lib/bill-share";
 import { CAFE_INSTAGRAM, CAFE_NAME, CAFE_TAGLINE } from "@/lib/brand";
 import {
@@ -52,9 +53,7 @@ export function PublicBillView({ loaded }: { loaded: LoadedSignedBill }) {
       <main className="grid min-h-dvh place-items-center p-6">
         <div className="w-full max-w-md rounded-card border border-hairline bg-card p-6 md:p-8">
           <div className="mb-6 flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-lg bg-accent text-white">
-              <Flame size={18} strokeWidth={1.5} aria-hidden />
-            </span>
+            <BrandLogo size={38} />
             <div className="leading-tight">
               <span className="block text-base font-medium tracking-tight">
                 {CAFE_NAME}
@@ -82,9 +81,7 @@ export function PublicBillView({ loaded }: { loaded: LoadedSignedBill }) {
         <div className="rounded-card border border-hairline bg-card p-6 print:border-0 print:p-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
-              <span className="grid size-9 place-items-center rounded-lg bg-accent text-white">
-                <Flame size={18} strokeWidth={1.5} aria-hidden />
-              </span>
+              <BrandLogo size={38} />
               <div className="leading-tight">
                 <span className="block text-base font-medium tracking-tight">
                   {CAFE_NAME}
