@@ -16,138 +16,147 @@ type SampleCategory = {
 };
 
 const SAMPLE_ADDONS = [
-  { name: "Extra Espresso Shot", price: 40 },
-  { name: "Almond Milk", price: 50 },
-  { name: "Oat Milk", price: 50 },
-  { name: "Extra Cheese", price: 30 },
+  { name: "Peri-Peri Dust", price: 20 },
+  { name: "Liquid Cheese Dip", price: 40 },
+  { name: "Chipotle Mayo", price: 30 },
+  { name: "Jalapenos", price: 30 },
+  { name: "Extra Cheese Slice", price: 35 },
 ] as const;
 
 const SAMPLE_CATEGORIES: SampleCategory[] = [
   {
-    name: "Hot Coffee",
+    name: "Signature Fries",
     items: [
       {
-        name: "Espresso",
-        price: 110,
+        name: "Classic Salted Fries",
+        price: 99,
         variants: [
-          { name: "Single", price: 110 },
-          { name: "Double", price: 150 },
+          { name: "Regular", price: 99 },
+          { name: "Large", price: 139 },
         ],
-        addons: ["Extra Espresso Shot"],
+        addons: ["Peri-Peri Dust", "Liquid Cheese Dip", "Chipotle Mayo"],
       },
       {
-        name: "Americano",
-        price: 130,
+        name: "Peri-Peri Crinkle Fries",
+        price: 119,
         variants: [
-          { name: "Regular", price: 130 },
-          { name: "Large", price: 160 },
+          { name: "Regular", price: 119 },
+          { name: "Large", price: 159 },
         ],
-        addons: ["Extra Espresso Shot"],
+        addons: ["Liquid Cheese Dip", "Chipotle Mayo", "Jalapenos"],
       },
       {
-        name: "Cappuccino",
-        price: 150,
+        name: "Cheesy Loaded Fries",
+        price: 159,
         variants: [
-          { name: "Regular", price: 150 },
-          { name: "Large", price: 190 },
+          { name: "Regular", price: 159 },
+          { name: "Large", price: 209 },
         ],
-        addons: ["Extra Espresso Shot", "Almond Milk", "Oat Milk"],
+        addons: ["Peri-Peri Dust", "Liquid Cheese Dip", "Jalapenos"],
       },
       {
-        name: "Cafe Latte",
-        price: 160,
+        name: "Chicken Overload Fries",
+        price: 199,
         variants: [
-          { name: "Regular", price: 160 },
-          { name: "Large", price: 200 },
+          { name: "Regular", price: 199 },
+          { name: "Large", price: 249 },
         ],
-        addons: ["Extra Espresso Shot", "Almond Milk", "Oat Milk"],
+        addons: ["Peri-Peri Dust", "Liquid Cheese Dip", "Chipotle Mayo", "Jalapenos"],
       },
       {
-        name: "Mocha",
-        price: 180,
+        name: "Truffle Parm Fries",
+        price: 179,
         variants: [
-          { name: "Regular", price: 180 },
-          { name: "Large", price: 220 },
+          { name: "Regular", price: 179 },
+          { name: "Large", price: 229 },
         ],
-        addons: ["Extra Espresso Shot", "Almond Milk", "Oat Milk"],
+        addons: ["Liquid Cheese Dip"],
       },
     ],
   },
   {
-    name: "Iced & Cold Brew",
+    name: "Crispy Tenders & Bites",
     items: [
       {
-        name: "Classic Cold Brew",
-        price: 160,
+        name: "Crispy Chicken Tenders",
+        price: 169,
         variants: [
-          { name: "Regular", price: 160 },
-          { name: "Large", price: 200 },
+          { name: "4 pc", price: 169 },
+          { name: "8 pc", price: 299 },
         ],
-        addons: ["Extra Espresso Shot", "Oat Milk"],
+        addons: ["Peri-Peri Dust", "Liquid Cheese Dip", "Chipotle Mayo"],
       },
       {
-        name: "Iced Americano",
-        price: 140,
+        name: "Hot Honey Wings",
+        price: 179,
         variants: [
-          { name: "Regular", price: 140 },
-          { name: "Large", price: 170 },
+          { name: "4 pc", price: 179 },
+          { name: "8 pc", price: 319 },
         ],
-        addons: ["Extra Espresso Shot"],
+        addons: ["Chipotle Mayo", "Liquid Cheese Dip"],
       },
       {
-        name: "Iced Latte",
-        price: 170,
+        name: "Popcorn Chicken Cup",
+        price: 139,
         variants: [
-          { name: "Regular", price: 170 },
-          { name: "Large", price: 210 },
+          { name: "Regular", price: 139 },
+          { name: "Large", price: 189 },
         ],
-        addons: ["Extra Espresso Shot", "Almond Milk", "Oat Milk"],
+        addons: ["Peri-Peri Dust", "Liquid Cheese Dip", "Chipotle Mayo"],
       },
       {
-        name: "Vietnamese Iced Coffee",
-        price: 190,
-        addons: ["Extra Espresso Shot"],
+        name: "Mozzarella Cheese Sticks",
+        price: 149,
+        variants: [
+          { name: "4 pc", price: 149 },
+          { name: "8 pc", price: 269 },
+        ],
+        addons: ["Chipotle Mayo", "Peri-Peri Dust"],
+      },
+      {
+        name: "Jalapeno Cheese Poppers",
+        price: 139,
+        variants: [
+          { name: "6 pc", price: 139 },
+          { name: "10 pc", price: 219 },
+        ],
+        addons: ["Liquid Cheese Dip", "Chipotle Mayo"],
       },
     ],
   },
   {
-    name: "Tea & Matcha",
+    name: "Smash & Crispy Burgers",
     items: [
       {
-        name: "Masala Chai",
-        price: 90,
-        variants: [
-          { name: "Regular", price: 90 },
-          { name: "Large", price: 120 },
-        ],
+        name: "OG Crispy Chicken Burger",
+        price: 179,
+        addons: ["Extra Cheese Slice", "Jalapenos", "Chipotle Mayo", "Peri-Peri Dust"],
       },
       {
-        name: "Iced Matcha Latte",
-        price: 210,
-        variants: [
-          { name: "Regular", price: 210 },
-          { name: "Large", price: 250 },
-        ],
-        addons: ["Almond Milk", "Oat Milk"],
+        name: "Nashville Hot Chicken Burger",
+        price: 199,
+        addons: ["Extra Cheese Slice", "Jalapenos", "Chipotle Mayo", "Liquid Cheese Dip"],
       },
-      { name: "Lemon Iced Tea", price: 120 },
+      {
+        name: "Crispy Paneer Zinger Burger",
+        price: 169,
+        addons: ["Extra Cheese Slice", "Jalapenos", "Chipotle Mayo", "Peri-Peri Dust"],
+      },
     ],
   },
   {
-    name: "Sandwiches & Bites",
+    name: "Coolers & Shakes",
     items: [
       {
-        name: "Grilled Cheese Toastie",
-        price: 150,
-        addons: ["Extra Cheese"],
+        name: "Chilled Cola",
+        price: 60,
+        variants: [
+          { name: "Regular", price: 60 },
+          { name: "Large", price: 90 },
+        ],
       },
-      {
-        name: "Pesto Veg Sandwich",
-        price: 180,
-        addons: ["Extra Cheese"],
-      },
-      { name: "Butter Croissant", price: 130 },
-      { name: "Chocolate Brownie", price: 140 },
+      { name: "Peach Iced Tea", price: 110 },
+      { name: "Thick Chocolate Shake", price: 159 },
     ],
   },
 ];
@@ -158,26 +167,67 @@ const SAMPLE_COMBOS: {
   items: { name: string; qty: number }[];
 }[] = [
   {
-    name: "Coffee + Sandwich Combo",
-    price: 249,
+    name: "Eat Fry Repeat Meal",
+    price: 269,
     items: [
-      { name: "Cappuccino", qty: 1 },
-      { name: "Grilled Cheese Toastie", qty: 1 },
+      { name: "OG Crispy Chicken Burger", qty: 1 },
+      { name: "Peri-Peri Crinkle Fries", qty: 1 },
     ],
   },
   {
-    name: "Two Cold Brews Combo",
-    price: 299,
-    items: [{ name: "Classic Cold Brew", qty: 2 }],
+    name: "Tender & Fries Box",
+    price: 249,
+    items: [
+      { name: "Crispy Chicken Tenders", qty: 1 },
+      { name: "Classic Salted Fries", qty: 1 },
+      { name: "Chilled Cola", qty: 1 },
+    ],
+  },
+  {
+    name: "Double Fry Bucket",
+    price: 289,
+    items: [
+      { name: "Cheesy Loaded Fries", qty: 1 },
+      { name: "Popcorn Chicken Cup", qty: 1 },
+    ],
   },
 ];
 
-/** Inserts the starter menu only if the database has no categories yet. */
-export async function seedSampleMenuInDb(db: Db): Promise<{ seeded: boolean }> {
-  const existing = await db.select({ id: schema.categories.id }).from(schema.categories).limit(1);
-  if (existing.length > 0) return { seeded: false };
+/**
+ * Inserts the FRY starter menu if no categories exist yet, or replaces an
+ * un-ordered menu when `replace` is true.
+ */
+export async function seedSampleMenuInDb(
+  db: Db,
+  { replace = false }: { replace?: boolean } = {},
+): Promise<{ seeded: boolean; reason?: string }> {
+  if (replace) {
+    const existingOrders = await db
+      .select({ id: schema.orders.id })
+      .from(schema.orders)
+      .limit(1);
+    if (existingOrders.length > 0) {
+      return { seeded: false, reason: "orders already exist" };
+    }
+  } else {
+    const existing = await db
+      .select({ id: schema.categories.id })
+      .from(schema.categories)
+      .limit(1);
+    if (existing.length > 0) return { seeded: false, reason: "categories already exist" };
+  }
 
   await db.transaction(async (tx) => {
+    if (replace) {
+      await tx.delete(schema.comboItems);
+      await tx.delete(schema.combos);
+      await tx.delete(schema.itemAddons);
+      await tx.delete(schema.itemVariants);
+      await tx.delete(schema.items);
+      await tx.delete(schema.addons);
+      await tx.delete(schema.categories);
+    }
+
     const addonIds = new Map<string, string>();
     const insertedAddons = await tx
       .insert(schema.addons)

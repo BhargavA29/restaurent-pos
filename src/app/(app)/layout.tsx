@@ -1,8 +1,8 @@
-import { Coffee, LogOut } from "lucide-react";
+import { Flame, LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { Nav } from "@/components/nav";
 import { requireOwner } from "@/lib/auth";
-import { CAFE_NAME } from "@/lib/brand";
+import { CAFE_INSTAGRAM, CAFE_NAME } from "@/lib/brand";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const owner = await requireOwner();
@@ -13,9 +13,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <aside className="fixed inset-x-0 bottom-0 z-10 border-t border-hairline bg-sidebar pb-[env(safe-area-inset-bottom)] md:sticky md:inset-auto md:top-0 md:flex md:h-dvh md:flex-col md:border-t-0 md:border-e md:p-4 md:pb-4">
         <div className="mb-6 hidden items-center gap-3 px-3 pt-1 md:flex">
           <span className="grid size-8 place-items-center rounded-lg bg-accent text-accent-ink">
-            <Coffee size={16} strokeWidth={1.5} aria-hidden />
+            <Flame size={16} strokeWidth={1.5} aria-hidden />
           </span>
-          <span className="text-base font-medium">{CAFE_NAME}</span>
+          <div className="leading-tight">
+            <span className="block text-base font-medium tracking-tight">{CAFE_NAME}</span>
+            <span className="block font-mono text-xs text-ink-3">{CAFE_INSTAGRAM}</span>
+          </div>
         </div>
 
         <div className="px-2 py-1 md:p-0">
@@ -38,9 +41,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header className="flex items-center justify-between border-b border-hairline bg-sidebar px-4 py-2.5 md:hidden">
           <div className="flex items-center gap-2.5">
             <span className="grid size-8 place-items-center rounded-lg bg-accent text-accent-ink">
-              <Coffee size={16} strokeWidth={1.5} aria-hidden />
+              <Flame size={16} strokeWidth={1.5} aria-hidden />
             </span>
-            <span className="text-base font-medium">{CAFE_NAME}</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-base font-medium tracking-tight">{CAFE_NAME}</span>
+              <span className="font-mono text-xs text-ink-3">{CAFE_INSTAGRAM}</span>
+            </div>
           </div>
 
           <form action={logout}>

@@ -198,8 +198,8 @@ export function MenuManager({
         <section className="rounded-card border border-hairline bg-card p-6 md:p-8">
           <h2 className="text-lg font-medium">No menu items yet</h2>
           <p className="mt-1.5 max-w-xl text-sm text-ink-2">
-            Load a sample cafe menu with coffee, cold brew, tea, bites, size variations,
-            add-ons, and combos to edit, or start by adding your first category.
+            Load the starter FRY menu with signature fries, crispy bites, burgers, coolers,
+            size variations, add-ons, and combos to edit, or start by adding your first category.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
@@ -208,7 +208,7 @@ export function MenuManager({
               onClick={() => startSeedTransition(() => void seedSampleMenu())}
               className="btn btn-primary px-5 text-sm"
             >
-              {seedPending ? "Loading sample menu" : "Load sample cafe menu"}
+              {seedPending ? "Loading starter menu" : "Load FRY starter menu"}
             </button>
             <button
               type="button"
@@ -265,7 +265,7 @@ export function MenuManager({
                       onClick={() =>
                         setModal({ kind: "item", item: null, defaultCategoryId: cat.id })
                       }
-                      className="font-medium text-accent hover:underline"
+                      className="font-medium text-accent-text hover:underline"
                     >
                       Add item
                     </button>

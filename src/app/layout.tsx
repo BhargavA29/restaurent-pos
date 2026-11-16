@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { CAFE_NAME } from "@/lib/brand";
+import { CAFE_INSTAGRAM, CAFE_NAME } from "@/lib/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,14 +15,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: { default: CAFE_NAME, template: `%s · ${CAFE_NAME}` },
-  description: "Orders and billing for a takeaway cafe",
+  description: `Counter POS and billing for ${CAFE_NAME} (${CAFE_INSTAGRAM})`,
 };
 
 export const viewport: Viewport = {
   colorScheme: "light dark",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
-    { media: "(prefers-color-scheme: dark)", color: "#141415" },
+    { media: "(prefers-color-scheme: light)", color: "#faf9f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#131211" },
   ],
 };
 

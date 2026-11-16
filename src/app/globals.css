@@ -1,29 +1,92 @@
 @import "tailwindcss";
 
 /*
-  Design tokens. Neutral graphite surfaces, one espresso accent.
-  Spacing sits on a 4px grid; Tailwind's default scale already is one.
+  Design tokens for FRY (@eatfryrepeat_).
+  Warm-graphite neutral surfaces keep long counter sessions calm;
+  brand orange (#f73e00) marks the brand badge, primary action, and focus ring.
 */
 :root {
   color-scheme: light dark;
 
-  --bg: light-dark(#fafafa, #141415);
-  --sidebar: light-dark(#f4f4f5, #0f0f10);
-  --card: light-dark(#ffffff, #19191b);
-  --raised: light-dark(#f4f4f5, #232325);
-  --hairline: light-dark(rgb(23 23 23 / 0.1), rgb(237 237 237 / 0.1));
-  --hairline-strong: light-dark(rgb(23 23 23 / 0.2), rgb(237 237 237 / 0.22));
+  --brand: #f73e00;
+  --accent: #f73e00;
+  --accent-ink: #110602;
 
-  --text: light-dark(#171717, #ededed);
-  --text-2: light-dark(#525252, #a1a1a6);
-  --text-3: light-dark(#6b6b6b, #85858b);
+  --bg-light: #faf9f7;
+  --bg-dark: #131211;
+  --sidebar-light: #f3f1ed;
+  --sidebar-dark: #0d0c0c;
+  --card-light: #ffffff;
+  --card-dark: #191817;
+  --raised-light: #f2efea;
+  --raised-dark: #242220;
+  --hairline-light: rgb(22 21 20 / 0.1);
+  --hairline-dark: rgb(242 239 235 / 0.1);
+  --hairline-strong-light: rgb(22 21 20 / 0.2);
+  --hairline-strong-dark: rgb(242 239 235 / 0.22);
 
-  --accent: light-dark(#7a4a2b, #d2a679);
-  --accent-ink: light-dark(#ffffff, #1b130d);
-  --accent-soft: light-dark(rgb(122 74 43 / 0.1), rgb(210 166 121 / 0.14));
+  --text-light: #161514;
+  --text-dark: #f2efeb;
+  --text-2-light: #524e4a;
+  --text-2-dark: #a6a09a;
+  --text-3-light: #6e6963;
+  --text-3-dark: #8a837c;
 
-  --positive: light-dark(#16a34a, #4cc38a);
-  --negative: light-dark(#dc2626, #e5484d);
+  --accent-text-light: #c42f00;
+  --accent-text-dark: #ff6a38;
+  --accent-soft-light: rgb(247 62 0 / 0.12);
+  --accent-soft-dark: rgb(247 62 0 / 0.16);
+
+  --positive-light: #16a34a;
+  --positive-dark: #4cc38a;
+  --negative-light: #dc2626;
+  --negative-dark: #e5484d;
+
+  --bg: var(--bg-light);
+  --sidebar: var(--sidebar-light);
+  --card: var(--card-light);
+  --raised: var(--raised-light);
+  --hairline: var(--hairline-light);
+  --hairline-strong: var(--hairline-strong-light);
+  --text: var(--text-light);
+  --text-2: var(--text-2-light);
+  --text-3: var(--text-3-light);
+  --accent-text: var(--accent-text-light);
+  --accent-soft: var(--accent-soft-light);
+  --positive: var(--positive-light);
+  --negative: var(--negative-light);
+
+  @media (prefers-color-scheme: dark) {
+    --bg: var(--bg-dark);
+    --sidebar: var(--sidebar-dark);
+    --card: var(--card-dark);
+    --raised: var(--raised-dark);
+    --hairline: var(--hairline-dark);
+    --hairline-strong: var(--hairline-strong-dark);
+    --text: var(--text-dark);
+    --text-2: var(--text-2-dark);
+    --text-3: var(--text-3-dark);
+    --accent-text: var(--accent-text-dark);
+    --accent-soft: var(--accent-soft-dark);
+    --positive: var(--positive-dark);
+    --negative: var(--negative-dark);
+  }
+
+  @supports (color: light-dark(white, black)) {
+    --bg: light-dark(var(--bg-light), var(--bg-dark));
+    --sidebar: light-dark(var(--sidebar-light), var(--sidebar-dark));
+    --card: light-dark(var(--card-light), var(--card-dark));
+    --raised: light-dark(var(--raised-light), var(--raised-dark));
+    --hairline: light-dark(var(--hairline-light), var(--hairline-dark));
+    --hairline-strong: light-dark(var(--hairline-strong-light), var(--hairline-strong-dark));
+    --text: light-dark(var(--text-light), var(--text-dark));
+    --text-2: light-dark(var(--text-2-light), var(--text-2-dark));
+    --text-3: light-dark(var(--text-3-light), var(--text-3-dark));
+    --accent-text: light-dark(var(--accent-text-light), var(--accent-text-dark));
+    --accent-soft: light-dark(var(--accent-soft-light), var(--accent-soft-dark));
+    --positive: light-dark(var(--positive-light), var(--positive-dark));
+    --negative: light-dark(var(--negative-light), var(--negative-dark));
+  }
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -38,8 +101,10 @@
   --color-ink: var(--text);
   --color-ink-2: var(--text-2);
   --color-ink-3: var(--text-3);
+  --color-brand: var(--brand);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-accent-text: var(--accent-text);
   --color-accent-soft: var(--accent-soft);
   --color-positive: var(--positive);
   --color-negative: var(--negative);
@@ -54,6 +119,7 @@
 html {
   background: var(--bg);
   color: var(--text);
+  accent-color: var(--accent);
   /* Follow the OS text size setting. */
   font-size: 100%;
   -webkit-text-size-adjust: 100%;
@@ -163,6 +229,12 @@ dialog[open] {
   padding: 1.5rem;
   color: var(--text);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+
+@media (forced-colors: active) {
+  [aria-current="page"] {
+    outline: 1px solid Highlight;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

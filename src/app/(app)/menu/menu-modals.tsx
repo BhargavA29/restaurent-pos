@@ -143,7 +143,7 @@ function CategoryForm({
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Hot Coffee"
+          placeholder="Signature Fries"
           required
           autoFocus
           className="field"
@@ -259,7 +259,7 @@ function AddonForm({ addon, onClose }: { addon: AddonRow | null; onClose: () => 
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Extra Espresso Shot"
+          placeholder="Peri-Peri Dust"
           required
           autoFocus
           className="field"
@@ -277,7 +277,7 @@ function AddonForm({ addon, onClose }: { addon: AddonRow | null; onClose: () => 
           min={0}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          placeholder="40"
+          placeholder="20"
           required
           className="field font-mono"
         />
@@ -409,7 +409,7 @@ function ItemForm({
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Cappuccino"
+          placeholder="Peri-Peri Crinkle Fries"
           required
           autoFocus
           className="field"
@@ -446,7 +446,7 @@ function ItemForm({
             min={0}
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            placeholder="150"
+            placeholder="119"
             required={variantRows.length === 0}
             className="field font-mono"
           />
@@ -467,7 +467,7 @@ function ItemForm({
                 },
               ])
             }
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-accent-text transition-colors hover:bg-accent-soft"
           >
             <Plus size={14} strokeWidth={1.5} aria-hidden />
             Add variation
@@ -495,7 +495,7 @@ function ItemForm({
                   inputMode="numeric"
                   min={0}
                   aria-label={`Variation ${idx + 1} price in rupees`}
-                  placeholder="150"
+                  placeholder="119"
                   value={row.price}
                   onChange={(e) =>
                     setVariantRows((prev) =>
@@ -692,7 +692,7 @@ function ComboForm({
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Coffee + Sandwich Combo"
+          placeholder="Eat Fry Repeat Meal"
           required
           autoFocus
           className="field"
@@ -710,7 +710,7 @@ function ComboForm({
           min={0}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          placeholder="249"
+          placeholder="269"
           required
           className="field font-mono"
         />
