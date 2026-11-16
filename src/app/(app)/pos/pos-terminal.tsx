@@ -13,6 +13,7 @@ import {
 } from "@/lib/cart";
 import { formatRupees } from "@/lib/format";
 import { customerInfoSchema } from "@/lib/validators";
+import { CheckoutModal, KotPrintSlip, type CompletedOrder } from "./checkout-modal";
 import { CustomizeItemModal, type PosItem } from "./customize-modal";
 import { OrderTicket } from "./order-ticket";
 
@@ -29,28 +30,48 @@ export type PosCombo = {
   membersSummary: string;
 };
 
+export type PopularShortcut = {
+  id: string;
+  kind: "item" | "combo";
+  sourceId: string;
+  name: string;
+  variantId: string | null;
+  variantName: string | null;
+  price: number;
+  subtitle?: string;
+  orderCount: number;
+};
+
 type PosTerminalProps = {
   categories: PosCategory[];
   items: PosItem[];
   combos: PosCombo[];
+  initialPopular: PopularShortcut[];
 };
 
-export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
+export function PosTerminal({
+  categories,
+  items,
+  combos,
+  initialPopular,
+}: PosTerminalProps) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [orderType, setOrderType] = useState<OrderType>("takeaway");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerError, setCustomerError] = useState<string | null>(null);
 
+  const [popular, setPopular] = useState<PopularShortcut[]>(initialPopular);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [customizing, setCustomizing] = useState<PosItem | null>(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
-  const [chargePreviewOpen, setChargePreviewOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [completedOrder, setCompletedOrder] = useState<CompletedOrder | null>(null);
+  const [lastPrintableOrder, setLastPrintableOrder] = useState<CompletedOrder | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const mobileModalTitleId = useId();
-  const chargeModalTitleId = useId();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -144,6 +165,20 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
     });
   }
 
+  function handlePopularTap(shortcut: PopularShortcut) {
+    addLine({
+      key: buildCartKey(shortcut.kind, shortcut.sourceId, shortcut.variantId, []),
+      kind: shortcut.kind,
+      sourceId: shortcut.sourceId,
+      name: shortcut.name,
+      variantName: shortcut.variantName,
+      unitPrice: shortcut.price,
+      addons: [],
+      subtitle: shortcut.subtitle,
+      qty: 1,
+    });
+  }
+
   function updateQty(key: string, delta: number) {
     setLines((prev) =>
       prev
@@ -187,7 +222,31 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
     setCustomerPhone(parsed.data.customerPhone);
     setCustomerError(null);
     setMobileCartOpen(false);
-    setChargePreviewOpen(true);
+    setCompletedOrder(null);
+    setCheckoutOpen(true);
+  }
+
+  function handleOrderPlaced(completed: CompletedOrder) {
+    setCompletedOrder(completed);
+    setLastPrintableOrder(completed);
+    setLines([]);
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerError(null);
+
+    const qtyAddedByKey = new Map<string, number>();
+    for (const line of completed.items) {
+      const id = `${line.kind}:${line.sourceId}`;
+      qtyAddedByKey.set(id, (qtyAddedByKey.get(id) ?? 0) + line.qty);
+    }
+    if (qtyAddedByKey.size > 0) {
+      setPopular((prev) =>
+        prev.map((s) => {
+          const delta = qtyAddedByKey.get(s.id);
+          return delta ? { ...s, orderCount: s.orderCount + delta } : s;
+        }),
+      );
+    }
   }
 
   const totals = computeCartTotals(lines);
@@ -265,6 +324,55 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
                   );
                 })}
               </div>
+
+              {activeTab === "all" && !query && popular.length > 0 ? (
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h2 className="text-sm font-medium text-ink-2">
+                      Popular — 1-tap add
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                    {popular.map((shortcut) => {
+                      const countInCart = qtyBySource.get(shortcut.sourceId) ?? 0;
+                      return (
+                        <button
+                          key={`pop-${shortcut.id}`}
+                          type="button"
+                          onClick={() => handlePopularTap(shortcut)}
+                          className="flex min-h-20 flex-col justify-between gap-1.5 rounded-card border border-hairline bg-card px-3.5 py-3 text-left transition-colors hover:border-ink-3 active:scale-[0.99]"
+                        >
+                          <div className="flex w-full items-start justify-between gap-2">
+                            <span className="text-sm font-medium leading-snug text-ink">
+                              {shortcut.name}
+                              {shortcut.variantName ? (
+                                <span className="font-normal text-ink-3">
+                                  {" "}
+                                  · {shortcut.variantName}
+                                </span>
+                              ) : null}
+                            </span>
+                            {countInCart > 0 ? (
+                              <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
+                                {countInCart}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="flex w-full items-center justify-between gap-2">
+                            <span className="font-mono text-xs font-medium text-ink">
+                              {formatRupees(shortcut.price)}
+                            </span>
+                            <span className="text-xs font-medium text-accent-text">
+                              + Add
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
 
               {visibleCombos.length === 0 && visibleItems.length === 0 ? (
                 <div className="rounded-card border border-hairline bg-card px-4 py-8 text-center text-sm text-ink-3">
@@ -449,66 +557,21 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
         onAdd={addLine}
       />
 
-      <Modal
-        open={chargePreviewOpen}
-        onClose={() => setChargePreviewOpen(false)}
-        titleId={chargeModalTitleId}
-        title="Ready to charge"
-      >
-        <div className="flex flex-col gap-4">
-          <div className="rounded-control border border-hairline bg-bg p-3.5 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-ink-2">Order type</span>
-              <span className="font-medium">
-                {orderType === "takeaway" ? "Takeaway / Parcel" : "Self-pickup"}
-              </span>
-            </div>
-            {customerName.trim() ? (
-              <div className="mt-1.5 flex items-center justify-between">
-                <span className="text-ink-2">Customer</span>
-                <span>{customerName.trim()}</span>
-              </div>
-            ) : null}
-            {customerPhone.trim() ? (
-              <div className="mt-1.5 flex items-center justify-between">
-                <span className="text-ink-2">WhatsApp</span>
-                <span className="font-mono">{customerPhone.trim()}</span>
-              </div>
-            ) : null}
-            <div className="mt-2.5 flex items-baseline justify-between border-t border-hairline pt-2.5">
-              <span className="font-medium">Total payable</span>
-              <span className="font-mono text-lg font-medium">
-                {formatRupees(totals.total)}
-              </span>
-            </div>
-          </div>
+      <CheckoutModal
+        open={checkoutOpen}
+        lines={lines}
+        orderType={orderType}
+        customerName={customerName}
+        customerPhone={customerPhone}
+        completedOrder={completedOrder}
+        onOrderPlaced={handleOrderPlaced}
+        onClose={() => {
+          setCheckoutOpen(false);
+          setCompletedOrder(null);
+        }}
+      />
 
-          <p className="text-sm text-ink-2">
-            Split payments (Cash, UPI, Card), sequential bill numbers, WhatsApp bills, and
-            printed KOT slips are wired in Phase 4.
-          </p>
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                clearCart();
-                setChargePreviewOpen(false);
-              }}
-              className="btn btn-secondary px-4 text-sm"
-            >
-              Clear order
-            </button>
-            <button
-              type="button"
-              onClick={() => setChargePreviewOpen(false)}
-              className="btn btn-primary px-5 text-sm"
-            >
-              Back to order
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <KotPrintSlip order={lastPrintableOrder} />
     </div>
   );
 }

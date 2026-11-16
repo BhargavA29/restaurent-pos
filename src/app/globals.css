@@ -245,3 +245,29 @@ dialog[open] {
     animation-duration: 0.01ms !important;
   }
 }
+
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #kot-print-slip,
+  #kot-print-slip * {
+    visibility: visible;
+  }
+
+  #kot-print-slip {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 72mm;
+    background: #ffffff;
+    color: #000000;
+  }
+}

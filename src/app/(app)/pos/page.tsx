@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import { getDb } from "@/db";
 import {
@@ -9,12 +9,41 @@ import {
   itemAddons,
   items,
   itemVariants,
+  orderItems,
 } from "@/db/schema";
 import { requireOwner } from "@/lib/auth";
 import type { PosAddon, PosItem, PosVariant } from "./customize-modal";
-import { PosTerminal, type PosCombo } from "./pos-terminal";
+import { PosTerminal, type PopularShortcut, type PosCombo } from "./pos-terminal";
 
 export const metadata: Metadata = { title: "New order" };
+
+function itemToShortcut(item: PosItem, orderCount: number): PopularShortcut {
+  const defaultVariant = item.variants[0] ?? null;
+  return {
+    id: `item:${item.id}`,
+    kind: "item",
+    sourceId: item.id,
+    name: item.name,
+    variantId: defaultVariant?.id ?? null,
+    variantName: defaultVariant?.name ?? null,
+    price: defaultVariant ? defaultVariant.price : item.price,
+    orderCount,
+  };
+}
+
+function comboToShortcut(combo: PosCombo, orderCount: number): PopularShortcut {
+  return {
+    id: `combo:${combo.id}`,
+    kind: "combo",
+    sourceId: combo.id,
+    name: combo.name,
+    variantId: null,
+    variantName: null,
+    price: combo.price,
+    subtitle: combo.membersSummary,
+    orderCount,
+  };
+}
 
 export default async function PosPage() {
   await requireOwner();
@@ -28,6 +57,7 @@ export default async function PosPage() {
     itemAddonRows,
     comboRows,
     comboItemRows,
+    topOrderedRows,
   ] = await Promise.all([
     db
       .select({ id: categories.id, name: categories.name })
@@ -48,6 +78,16 @@ export default async function PosPage() {
       .where(eq(combos.active, true))
       .orderBy(asc(combos.sort), asc(combos.name)),
     db.select().from(comboItems),
+    db
+      .select({
+        kind: orderItems.kind,
+        name: orderItems.name,
+        totalQty: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int`,
+      })
+      .from(orderItems)
+      .groupBy(orderItems.kind, orderItems.name)
+      .orderBy(sql`sum(${orderItems.qty}) desc`)
+      .limit(10),
   ]);
 
   const activeCategoryIds = new Set(categoryRows.map((c) => c.id));
@@ -99,5 +139,52 @@ export default async function PosPage() {
     membersSummary: (membersByCombo.get(combo.id) ?? []).join(", "),
   }));
 
-  return <PosTerminal categories={categoryRows} items={posItems} combos={posCombos} />;
+  const availableItemsByName = new Map(
+    posItems.filter((i) => !i.soldOut).map((i) => [i.name, i]),
+  );
+  const availableCombosByName = new Map(
+    posCombos.filter((c) => !c.soldOut).map((c) => [c.name, c]),
+  );
+
+  const popular: PopularShortcut[] = [];
+  const seen = new Set<string>();
+
+  for (const top of topOrderedRows) {
+    if (popular.length >= 6) break;
+    if (top.kind === "combo") {
+      const combo = availableCombosByName.get(top.name);
+      if (combo && !seen.has(`combo:${combo.id}`)) {
+        seen.add(`combo:${combo.id}`);
+        popular.push(comboToShortcut(combo, top.totalQty));
+      }
+    } else {
+      const item = availableItemsByName.get(top.name);
+      if (item && !seen.has(`item:${item.id}`)) {
+        seen.add(`item:${item.id}`);
+        popular.push(itemToShortcut(item, top.totalQty));
+      }
+    }
+  }
+
+  const fallbackPool: PopularShortcut[] = [
+    ...posCombos.filter((c) => !c.soldOut).slice(0, 2).map((c) => comboToShortcut(c, 0)),
+    ...posItems.filter((i) => !i.soldOut).map((i) => itemToShortcut(i, 0)),
+  ];
+
+  for (const shortcut of fallbackPool) {
+    if (popular.length >= 6) break;
+    if (!seen.has(shortcut.id)) {
+      seen.add(shortcut.id);
+      popular.push(shortcut);
+    }
+  }
+
+  return (
+    <PosTerminal
+      categories={categoryRows}
+      items={posItems}
+      combos={posCombos}
+      initialPopular={popular}
+    />
+  );
 }

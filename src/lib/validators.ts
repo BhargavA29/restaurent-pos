@@ -75,6 +75,51 @@ export const comboSchema = z.object({
     .min(1, "Pick at least one item for the combo"),
 });
 
+export const paymentModeSchema = z.enum(["cash", "upi", "card"]);
+
+export const orderLineInputSchema = z.object({
+  kind: z.enum(["item", "combo"]),
+  sourceId: uuidSchema,
+  name: z.string().trim().min(1).max(100),
+  variantName: z.string().trim().max(50).nullable(),
+  unitPrice: moneySchema,
+  addons: z.array(
+    z.object({
+      name: z.string().trim().min(1).max(60),
+      price: moneySchema,
+    }),
+  ),
+  qty: z.number().int().min(1).max(999),
+  discount: moneySchema,
+  complimentary: z.boolean(),
+  lineTotal: moneySchema,
+});
+
+export const createOrderSchema = z
+  .object({
+    id: uuidSchema,
+    type: z.enum(["takeaway", "pickup"]),
+    customerName: z.string().trim().max(80),
+    customerPhone: optionalPhoneSchema,
+    subtotal: moneySchema,
+    discountTotal: moneySchema,
+    total: moneySchema,
+    placedAt: z.string().datetime(),
+    items: z.array(orderLineInputSchema).min(1, "Add at least one item"),
+    payments: z
+      .array(
+        z.object({
+          mode: paymentModeSchema,
+          amount: moneySchema,
+        }),
+      )
+      .min(1, "Select a payment method"),
+  })
+  .refine(
+    (data) => data.payments.reduce((sum, p) => sum + p.amount, 0) === data.total,
+    { message: "Payment amounts must add up to the order total" },
+  );
+
 /** Strict whole-rupee integer parser for form inputs; returns NaN for invalid/empty text. */
 export function parseRupeesInput(raw: string): number {
   const trimmed = raw.trim();
@@ -87,3 +132,6 @@ export type AddonInput = z.infer<typeof addonSchema>;
 export type VariantInput = z.infer<typeof variantSchema>;
 export type ItemInput = z.infer<typeof itemSchema>;
 export type ComboInput = z.infer<typeof comboSchema>;
+export type PaymentMode = z.infer<typeof paymentModeSchema>;
+export type OrderLineInput = z.infer<typeof orderLineInputSchema>;
+export type CreateOrderInput = z.infer<typeof createOrderSchema>;
