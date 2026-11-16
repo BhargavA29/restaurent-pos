@@ -10,11 +10,11 @@ import { owners } from "@/db/schema";
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
 
 const schema = z.object({
-  email: z.string().trim().toLowerCase().email(),
+  username: z.string().trim().toLowerCase().min(1),
   password: z.string().min(1),
 });
 
-// Compared against when the email is unknown, so timing doesn't reveal which emails exist.
+// Compared against when the username is unknown, so timing doesn't reveal which usernames exist.
 let dummyHash: string | undefined;
 function getDummyHash() {
   return (dummyHash ??= bcrypt.hashSync("not-a-real-password", 12));
@@ -24,19 +24,19 @@ export type LoginState = { error: string | null };
 
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = schema.safeParse({
-    email: formData.get("email"),
+    username: formData.get("username"),
     password: formData.get("password"),
   });
-  if (!parsed.success) return { error: "Enter your email and password" };
+  if (!parsed.success) return { error: "Enter your username and password" };
 
   const [owner] = await getDb()
     .select()
     .from(owners)
-    .where(eq(owners.email, parsed.data.email))
+    .where(eq(owners.username, parsed.data.username))
     .limit(1);
 
   const ok = await bcrypt.compare(parsed.data.password, owner?.passwordHash ?? getDummyHash());
-  if (!owner || !ok) return { error: "Email or password is wrong" };
+  if (!owner || !ok) return { error: "Username or password is wrong" };
 
   const jar = await cookies();
   jar.set(

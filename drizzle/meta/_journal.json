@@ -15,6 +15,13 @@
       "when": 1794832443547,
       "tag": "0001_concerned_blob",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794834200000,
+      "tag": "0002_owner_username",
+      "breakpoints": true
     }
   ]
 }

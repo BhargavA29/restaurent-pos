@@ -1,11 +1,13 @@
-// Creates an owner account in the database in DATABASE_URL.
-// Usage: npm run owner:create -- "Name" email@example.com
-//        npm run owner:create:prod -- "Name" email@example.com
+// Creates or updates an owner account in the database in DATABASE_URL.
+// Usage: npm run owner:create -- "Name" username
+//        npm run owner:create:prod -- "Name" username
 // The password is read from the OWNER_PASSWORD environment variable,
 // or prompted for, so it never lands in shell history.
 import { Pool } from "@neondatabase/serverless";
 import bcrypt from "bcryptjs";
 import { createInterface } from "node:readline/promises";
+
+const USERNAME_RE = /^[a-z0-9._-]{2,40}$/;
 
 async function readPassword() {
   if (process.env.OWNER_PASSWORD) return process.env.OWNER_PASSWORD;
@@ -19,11 +21,16 @@ async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
 
-  const [name, rawEmail] = process.argv.slice(2);
-  if (!name || !rawEmail) {
-    throw new Error('Usage: owner:create -- "Name" email@example.com');
+  const [name, rawUsername] = process.argv.slice(2);
+  if (!name || !rawUsername) {
+    throw new Error('Usage: owner:create -- "Name" username');
   }
-  const email = rawEmail.trim().toLowerCase();
+  const username = rawUsername.trim().toLowerCase();
+  if (!USERNAME_RE.test(username)) {
+    throw new Error(
+      "Username must be 2-40 characters (letters, numbers, '.', '_', '-')",
+    );
+  }
 
   const password = await readPassword();
   if (password.length < 8) throw new Error("Password must be at least 8 characters");
@@ -31,11 +38,15 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 12);
   const pool = new Pool({ connectionString: url });
   await pool.query(
-    "insert into owners (name, email, password_hash) values ($1, $2, $3)",
-    [name.trim(), email, passwordHash],
+    `insert into owners (name, username, password_hash)
+     values ($1, $2, $3)
+     on conflict (username) do update
+       set name = excluded.name,
+           password_hash = excluded.password_hash`,
+    [name.trim(), username, passwordHash],
   );
   await pool.end();
-  console.log(`Created owner ${email} on ${new URL(url).host}`);
+  console.log(`Saved owner ${username} on ${new URL(url).host}`);
 }
 
 main().catch((err) => {
