@@ -13,6 +13,7 @@ import {
 } from "@/lib/cart";
 import { formatRupees } from "@/lib/format";
 import {
+  listPendingOrders,
   loadLocalCustomers,
   saveCachedMenu,
   saveLocalCustomers,
@@ -112,6 +113,15 @@ export function PosTerminal({
     let cancelled = false;
     void (async () => {
       try {
+        const pending = await listPendingOrders();
+        if (cancelled) return;
+
+        if (pending.length === 0) {
+          setCustomers(initialCustomers);
+          await saveLocalCustomers(initialCustomers);
+          return;
+        }
+
         const cached = await loadLocalCustomers();
         if (cancelled) return;
         const merged = new Map<string, CustomerRecord>();
