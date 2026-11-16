@@ -1,13 +1,12 @@
 import { between, desc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import { getDb } from "@/db";
-import { customers, expenses, orderItems, orders, payments } from "@/db/schema";
+import { expenses, orderItems, orders, payments } from "@/db/schema";
 import { requireOwner } from "@/lib/auth";
 import { signBillId } from "@/lib/bill-share";
 import { isoDateSchema, type PaymentMode } from "@/lib/validators";
 import {
   DashboardView,
-  type DashboardCustomerRow,
   type DayBillRow,
   type DayRevenuePoint,
   type ExpenseItem,
@@ -74,63 +73,61 @@ export default async function DashboardPage({
   const dates = Array.from({ length: 7 }, (_, i) => shiftIsoDate(selectedDate, i - 6));
   const db = getDb();
 
-  const [dailyRows, topRows, expenseRows, billRows, paymentRows, customerRows] =
-    await Promise.all([
-      db
-        .select({
-          businessDate: orders.businessDate,
-          revenue: sql<number>`coalesce(sum(${orders.total}), 0)::int`,
-          orderCount: sql<number>`count(*)::int`,
-        })
-        .from(orders)
-        .where(between(orders.businessDate, dates[0], selectedDate))
-        .groupBy(orders.businessDate),
-      db
-        .select({
-          name: orderItems.name,
-          variantName: orderItems.variantName,
-          qty: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int`,
-          revenue: sql<number>`coalesce(sum(${orderItems.lineTotal}), 0)::int`,
-        })
-        .from(orderItems)
-        .innerJoin(orders, eq(orderItems.orderId, orders.id))
-        .where(eq(orders.businessDate, selectedDate))
-        .groupBy(orderItems.name, orderItems.variantName)
-        .orderBy(sql`sum(${orderItems.qty}) desc`, sql`sum(${orderItems.lineTotal}) desc`),
-      db
-        .select({
-          id: expenses.id,
-          spentOn: expenses.spentOn,
-          description: expenses.description,
-          amount: expenses.amount,
-          createdAt: expenses.createdAt,
-        })
-        .from(expenses)
-        .where(eq(expenses.spentOn, selectedDate))
-        .orderBy(desc(expenses.createdAt)),
-      db
-        .select({
-          id: orders.id,
-          billNo: orders.billNo,
-          type: orders.type,
-          customerName: orders.customerName,
-          total: orders.total,
-          placedAt: orders.placedAt,
-        })
-        .from(orders)
-        .where(eq(orders.businessDate, selectedDate))
-        .orderBy(desc(orders.billNo)),
-      db
-        .select({
-          mode: payments.mode,
-          amount: sql<number>`coalesce(sum(${payments.amount}), 0)::int`,
-        })
-        .from(payments)
-        .innerJoin(orders, eq(payments.orderId, orders.id))
-        .where(eq(orders.businessDate, selectedDate))
-        .groupBy(payments.mode),
-      db.select().from(customers).orderBy(desc(customers.lastOrderAt)).limit(50),
-    ]);
+  const [dailyRows, topRows, expenseRows, billRows, paymentRows] = await Promise.all([
+    db
+      .select({
+        businessDate: orders.businessDate,
+        revenue: sql<number>`coalesce(sum(${orders.total}), 0)::int`,
+        orderCount: sql<number>`count(*)::int`,
+      })
+      .from(orders)
+      .where(between(orders.businessDate, dates[0], selectedDate))
+      .groupBy(orders.businessDate),
+    db
+      .select({
+        name: orderItems.name,
+        variantName: orderItems.variantName,
+        qty: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int`,
+        revenue: sql<number>`coalesce(sum(${orderItems.lineTotal}), 0)::int`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(eq(orders.businessDate, selectedDate))
+      .groupBy(orderItems.name, orderItems.variantName)
+      .orderBy(sql`sum(${orderItems.qty}) desc`, sql`sum(${orderItems.lineTotal}) desc`),
+    db
+      .select({
+        id: expenses.id,
+        spentOn: expenses.spentOn,
+        description: expenses.description,
+        amount: expenses.amount,
+        createdAt: expenses.createdAt,
+      })
+      .from(expenses)
+      .where(eq(expenses.spentOn, selectedDate))
+      .orderBy(desc(expenses.createdAt)),
+    db
+      .select({
+        id: orders.id,
+        billNo: orders.billNo,
+        type: orders.type,
+        customerName: orders.customerName,
+        total: orders.total,
+        placedAt: orders.placedAt,
+      })
+      .from(orders)
+      .where(eq(orders.businessDate, selectedDate))
+      .orderBy(desc(orders.billNo)),
+    db
+      .select({
+        mode: payments.mode,
+        amount: sql<number>`coalesce(sum(${payments.amount}), 0)::int`,
+      })
+      .from(payments)
+      .innerJoin(orders, eq(payments.orderId, orders.id))
+      .where(eq(orders.businessDate, selectedDate))
+      .groupBy(payments.mode),
+  ]);
 
   const dailyByDate = new Map(dailyRows.map((r) => [r.businessDate, r]));
 
@@ -194,14 +191,6 @@ export default async function DashboardPage({
       revenue: stats.revenue,
     }));
 
-  const customerList: DashboardCustomerRow[] = customerRows.map((c) => ({
-    phone: c.phone,
-    name: c.name,
-    orderCount: c.orderCount,
-    totalSpent: c.totalSpent,
-    lastOrderAtIso: c.lastOrderAt.toISOString(),
-  }));
-
   return (
     <DashboardView
       key={selectedDate}
@@ -216,7 +205,6 @@ export default async function DashboardPage({
       bills={bills}
       paymentTotals={paymentTotals}
       hourlyBreakdown={hourlyBreakdown}
-      customers={customerList}
     />
   );
 }

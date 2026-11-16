@@ -1,12 +1,13 @@
 "use client";
 
-import { BarChart3, LayoutGrid, ReceiptText, type LucideIcon } from "lucide-react";
+import { BarChart3, LayoutGrid, ReceiptText, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/pos", label: "New order", icon: ReceiptText },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
+  { href: "/customers", label: "Customers", icon: Users },
   { href: "/menu", label: "Menu", icon: LayoutGrid },
 ];
 

@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Download,
   ExternalLink,
-  MessageCircle,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -56,14 +55,6 @@ export type HourlyBucket = {
   revenue: number;
 };
 
-export type DashboardCustomerRow = {
-  phone: string;
-  name: string;
-  orderCount: number;
-  totalSpent: number;
-  lastOrderAtIso: string;
-};
-
 type DashboardViewProps = {
   selectedDate: string;
   selectedDateLabel: string;
@@ -76,7 +67,6 @@ type DashboardViewProps = {
   bills: DayBillRow[];
   paymentTotals: Record<PaymentMode, number>;
   hourlyBreakdown: HourlyBucket[];
-  customers: DashboardCustomerRow[];
 };
 
 const timeOnlyFormatter = new Intl.DateTimeFormat("en-IN", {
@@ -101,7 +91,6 @@ export function DashboardView({
   bills,
   paymentTotals,
   hourlyBreakdown,
-  customers,
 }: DashboardViewProps) {
   const router = useRouter();
   const dateInputId = useId();
@@ -770,63 +759,6 @@ export function DashboardView({
             </ul>
           )}
         </div>
-      </section>
-
-      <section className="rounded-card border border-hairline bg-card p-5 md:p-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h2 className="text-base font-medium">Customers</h2>
-            <p className="mt-0.5 text-xs text-ink-3">
-              Saved from orders and cached on the counter device for instant phone lookup
-            </p>
-          </div>
-          <span className="font-mono text-xs text-ink-3">{customers.length}</span>
-        </div>
-
-        {customers.length === 0 ? (
-          <p className="mt-6 text-sm text-ink-3">
-            No saved customer phone numbers yet
-          </p>
-        ) : (
-          <div className="mt-4 overflow-x-auto rounded-control border border-hairline bg-bg">
-            <table className="w-full min-w-[34rem] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-hairline text-xs text-ink-3">
-                  <th className="px-4 py-2.5 font-medium">Customer</th>
-                  <th className="px-4 py-2.5 font-medium">WhatsApp</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Orders</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Total spent</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Last order</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {customers.map((customer) => (
-                  <tr key={customer.phone}>
-                    <td className="px-4 py-3 font-medium text-ink">{customer.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs">
-                      <a
-                        href={`https://wa.me/91${customer.phone}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-accent-text hover:underline"
-                      >
-                        <MessageCircle size={13} strokeWidth={1.5} aria-hidden />
-                        +91 {customer.phone}
-                      </a>
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">{customer.orderCount}</td>
-                    <td className="px-4 py-3 text-right font-mono font-medium">
-                      {formatRupees(customer.totalSpent)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs text-ink-3">
-                      {formatIstDateTime(customer.lastOrderAtIso)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </section>
     </div>
   );
