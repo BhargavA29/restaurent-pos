@@ -642,7 +642,7 @@ export function OrdersView({
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <a
-                          href={`/bill/${order.id}?s=${encodeURIComponent(order.sig)}`}
+                          href={order.billPath}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Open bill #${order.billNo}`}

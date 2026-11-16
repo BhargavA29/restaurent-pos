@@ -29,6 +29,7 @@ import { placeOrder } from "./actions";
 export type CompletedOrder = {
   orderId: string;
   sig: string;
+  shortCode?: string;
   billNo: number;
   queuedOffline?: boolean;
   type: OrderType;
@@ -256,6 +257,7 @@ function PaymentStage({
         onOrderPlaced({
           orderId: result.orderId,
           sig: result.sig,
+          shortCode: result.shortCode,
           billNo: result.billNo,
           type: orderType,
           customerName,
@@ -409,7 +411,9 @@ function ReceiptStage({
 
   const billLabel = order.queuedOffline ? `#OFF-${order.billNo}` : `#${order.billNo}`;
   const sigParam = encodeURIComponent(order.sig);
-  const billPath = `/bill/${order.orderId}?s=${sigParam}`;
+  const billPath = order.shortCode
+    ? `/b/${order.shortCode}`
+    : `/bill/${order.orderId}?s=${sigParam}`;
   const downloadPath = `/api/bill-image/${order.orderId}?s=${sigParam}&download=1`;
 
   function handleSendWhatsApp() {

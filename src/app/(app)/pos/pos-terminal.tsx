@@ -496,7 +496,10 @@ export function PosTerminal({
 
   return (
     <div className={totals.itemCount > 0 ? "pb-20 lg:pb-0" : undefined}>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_23rem] lg:items-start xl:grid-cols-[1fr_25rem]">
+      <div
+        id="pos-screen-content"
+        className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_23rem] lg:items-start xl:grid-cols-[1fr_25rem]"
+      >
         <section className="flex min-w-0 flex-col gap-5">
           <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -886,7 +889,7 @@ export function PosTerminal({
       </div>
 
       {totals.itemCount > 0 ? (
-        <div className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 lg:hidden">
+        <div className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 lg:hidden print:hidden">
           <button
             type="button"
             onClick={() => setMobileCartOpen(true)}

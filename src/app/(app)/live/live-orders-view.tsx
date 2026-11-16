@@ -28,7 +28,7 @@ import { LiveOrdersGridSkeleton } from "./loading";
 
 export type LiveOrderRow = {
   id: string;
-  sig: string;
+  billPath: string;
   billNo: number;
   type: OrderType;
   status: OrderStatus;
@@ -157,7 +157,7 @@ function LiveOrderCard({
           </strong>
         </span>
         <a
-          href={`/bill/${order.id}?s=${encodeURIComponent(order.sig)}`}
+          href={order.billPath}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-ink-2 hover:text-ink hover:underline"

@@ -5,11 +5,11 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
 import { customers, orderItems, orders, payments } from "@/db/schema";
 import { requireOwner } from "@/lib/auth";
-import { signBillId } from "@/lib/bill-share";
+import { buildShortBillCode, signBillId } from "@/lib/bill-share";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/validators";
 
 export type PlaceOrderResult =
-  | { billNo: number; orderId: string; sig: string }
+  | { billNo: number; orderId: string; sig: string; shortCode: string }
   | { error: string };
 
 const istDateFormatter = new Intl.DateTimeFormat("en-CA", {
@@ -103,7 +103,12 @@ export async function placeOrder(input: CreateOrderInput): Promise<PlaceOrderRes
     });
 
     revalidatePath("/dashboard");
-    return { billNo, orderId: data.id, sig: signBillId(data.id) };
+    return {
+      billNo,
+      orderId: data.id,
+      sig: signBillId(data.id),
+      shortCode: buildShortBillCode(billNo),
+    };
   } catch {
     return { error: "Could not save order. Check connection and try again." };
   }

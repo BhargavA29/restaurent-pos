@@ -41,7 +41,7 @@ export type ExpenseItem = {
 
 export type DayBillRow = {
   id: string;
-  sig: string;
+  billPath: string;
   billNo: number;
   type: OrderType;
   customerName: string | null;
@@ -658,7 +658,7 @@ export function DashboardView({
                       {formatRupees(bill.total)}
                     </span>
                     <a
-                      href={`/bill/${bill.id}?s=${encodeURIComponent(bill.sig)}`}
+                      href={bill.billPath}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`Open bill #${bill.billNo}`}

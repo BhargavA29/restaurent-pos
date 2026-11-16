@@ -8,7 +8,7 @@ import {
   type OrderAddonSnapshot,
 } from "@/db/schema";
 import { requireOwner } from "@/lib/auth";
-import { signBillId } from "@/lib/bill-share";
+import { buildShortBillPath } from "@/lib/bill-share";
 import type { OrderType } from "@/lib/cart";
 import type { OrderStatus, PaymentMode } from "@/lib/validators";
 import { LiveOrdersView, type LiveOrderRow } from "./live-orders-view";
@@ -111,7 +111,7 @@ export default async function LiveOrdersPage() {
 
   const initialOrders: LiveOrderRow[] = orderRows.map((o) => ({
     id: o.id,
-    sig: signBillId(o.id),
+    billPath: buildShortBillPath(o.billNo),
     billNo: o.billNo,
     type: o.type as OrderType,
     status: o.status as OrderStatus,

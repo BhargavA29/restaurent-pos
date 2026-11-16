@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { expenses, orderItems, orders, payments } from "@/db/schema";
 import { requireOwner } from "@/lib/auth";
-import { signBillId } from "@/lib/bill-share";
+import { buildShortBillPath } from "@/lib/bill-share";
 import { isoDateSchema, type PaymentMode } from "@/lib/validators";
 import {
   DashboardView,
@@ -154,7 +154,7 @@ export default async function DashboardPage({
 
   const bills: DayBillRow[] = billRows.map((b) => ({
     id: b.id,
-    sig: signBillId(b.id),
+    billPath: buildShortBillPath(b.billNo),
     billNo: b.billNo,
     type: b.type,
     customerName: b.customerName,

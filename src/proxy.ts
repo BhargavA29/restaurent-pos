@@ -9,6 +9,7 @@ export async function proxy(request: NextRequest) {
 
   if (
     pathname.startsWith("/bill/") ||
+    pathname.startsWith("/b/") ||
     pathname === "/icon" ||
     pathname === "/apple-icon"
   ) {

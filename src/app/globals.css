@@ -320,22 +320,45 @@ dialog[open] {
 }
 
 @media print {
-  body:has(#kot-print-slip) * {
-    visibility: hidden;
+  @page {
+    margin: 4mm;
   }
 
-  #kot-print-slip,
-  #kot-print-slip * {
-    visibility: visible;
+  html:has(#kot-print-slip),
+  body:has(#kot-print-slip),
+  body:has(#kot-print-slip) > div {
+    min-height: 0 !important;
+    height: auto !important;
+    display: block !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body:has(#kot-print-slip) aside,
+  body:has(#kot-print-slip) header,
+  body:has(#kot-print-slip) dialog,
+  body:has(#kot-print-slip) dialog[open],
+  body:has(#kot-print-slip) main > *:not(:has(#kot-print-slip)),
+  body:has(#kot-print-slip) main > div > *:not(#kot-print-slip),
+  body:has(#kot-print-slip) #pos-screen-content {
+    display: none !important;
+  }
+
+  body:has(#kot-print-slip) main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
   }
 
   #kot-print-slip {
-    display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
+    display: block !important;
+    position: static !important;
     width: 72mm;
-    background: #ffffff;
-    color: #000000;
+    margin: 0;
+    padding: 0;
+    background: #ffffff !important;
+    color: #000000 !important;
   }
 }

@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orderItems, orders, payments } from "@/db/schema";
-import { signBillId } from "@/lib/bill-share";
+import { buildShortBillPath } from "@/lib/bill-share";
 import type { OrderType } from "@/lib/cart";
 import {
   isoDateSchema,
@@ -42,7 +42,7 @@ export type OrdersFilterParams = {
 
 export type OrderTableRow = {
   id: string;
-  sig: string;
+  billPath: string;
   billNo: number;
   type: OrderType;
   status: OrderStatus;
@@ -295,7 +295,7 @@ export async function queryOrdersPage(
 
     return {
       id: o.id,
-      sig: signBillId(o.id),
+      billPath: buildShortBillPath(o.billNo),
       billNo: o.billNo,
       type: o.type as OrderType,
       status: o.status as OrderStatus,
