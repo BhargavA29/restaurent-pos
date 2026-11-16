@@ -34,9 +34,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </form>
       </aside>
 
-      <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-6 md:px-8 md:pb-10 md:pt-8">
-        {children}
-      </main>
+      <div className="flex min-w-0 flex-col">
+        <header className="flex items-center justify-between border-b border-hairline bg-sidebar px-4 py-2.5 md:hidden">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-8 place-items-center rounded-lg bg-accent text-accent-ink">
+              <Coffee size={16} strokeWidth={1.5} aria-hidden />
+            </span>
+            <span className="text-base font-medium">{CAFE_NAME}</span>
+          </div>
+
+          <form action={logout}>
+            <button
+              type="submit"
+              className="flex min-h-11 items-center gap-2 rounded-control px-3 text-sm text-ink-2 transition-colors hover:bg-raised hover:text-ink"
+            >
+              <LogOut size={16} strokeWidth={1.5} aria-hidden />
+              Sign out
+            </button>
+          </form>
+        </header>
+
+        <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-6 md:px-8 md:pb-10 md:pt-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

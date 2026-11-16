@@ -122,6 +122,47 @@ body {
   .btn-primary:hover:not(:disabled) {
     opacity: 0.92;
   }
+  .btn-secondary {
+    border: 1px solid var(--hairline-strong);
+    background: var(--raised);
+    color: var(--text);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--text-3);
+  }
+  .btn-danger {
+    border: 1px solid color-mix(in srgb, var(--negative) 35%, transparent);
+    background: color-mix(in srgb, var(--negative) 10%, transparent);
+    color: var(--negative);
+  }
+  .btn-danger:hover:not(:disabled) {
+    border-color: var(--negative);
+  }
+}
+
+/* Native <dialog> modal: never set display on bare dialog, only dialog[open]. */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: rgb(0 0 0 / 0.5);
+}
+
+dialog[open] {
+  margin: auto;
+  width: calc(100% - 2rem);
+  max-width: 32rem;
+  max-height: 90dvh;
+  overflow-y: auto;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  background: var(--card);
+  padding: 1.5rem;
+  color: var(--text);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
 }
 
 @media (prefers-reduced-motion: reduce) {

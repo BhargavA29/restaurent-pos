@@ -11,7 +11,8 @@
     "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
     "db:migrate:prod": "tsx --env-file=.env.prod scripts/migrate.ts",
     "owner:create": "tsx --env-file=.env.local scripts/create-owner.ts",
-    "owner:create:prod": "tsx --env-file=.env.prod scripts/create-owner.ts"
+    "owner:create:prod": "tsx --env-file=.env.prod scripts/create-owner.ts",
+    "db:seed": "tsx --env-file=.env.local scripts/seed.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",
