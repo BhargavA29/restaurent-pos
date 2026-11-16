@@ -120,6 +120,21 @@ export const createOrderSchema = z
     { message: "Payment amounts must add up to the order total" },
   );
 
+export const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a valid date");
+
+export const expenseSchema = z.object({
+  id: uuidSchema,
+  spentOn: isoDateSchema,
+  description: z.string().trim().min(1, "Enter what the expense was for").max(120),
+  amount: z
+    .number({ error: "Enter a valid amount in ₹" })
+    .int("Amount must be whole rupees")
+    .min(1, "Expense must be at least ₹1")
+    .max(100_000, "Amount cannot exceed ₹1,00,000"),
+});
+
 /** Strict whole-rupee integer parser for form inputs; returns NaN for invalid/empty text. */
 export function parseRupeesInput(raw: string): number {
   const trimmed = raw.trim();
@@ -135,3 +150,4 @@ export type ComboInput = z.infer<typeof comboSchema>;
 export type PaymentMode = z.infer<typeof paymentModeSchema>;
 export type OrderLineInput = z.infer<typeof orderLineInputSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type ExpenseInput = z.infer<typeof expenseSchema>;
