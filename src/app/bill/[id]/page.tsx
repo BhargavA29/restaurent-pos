@@ -26,7 +26,7 @@ export async function generateMetadata({
   if (loaded.status !== "ok") {
     return {
       title: `Bill unavailable · ${CAFE_NAME}`,
-      description: "This digital bill link has expired or is invalid.",
+      description: "This digital bill link is invalid or could not be found.",
       robots: { index: false, follow: false },
     };
   }
@@ -36,7 +36,7 @@ export async function generateMetadata({
   const title = `${CAFE_NAME} · Bill #${order.billNo} — ${formatRupees(order.total)}`;
   const description = `${ORDER_TYPE_LABEL[order.type]} · ${itemCount} ${
     itemCount === 1 ? "item" : "items"
-  } · Paid via ${formatPaymentsSummary(payments)} (Link valid for 48 hours)`;
+  } · Paid via ${formatPaymentsSummary(payments)}`;
   const imageUrl = `/api/bill-image/${id}?s=${encodeURIComponent(s ?? "")}`;
 
   return {
@@ -79,20 +79,16 @@ export default async function PublicBillPage({ params, searchParams }: BillPageP
             </div>
           </div>
 
-          <h1 className="text-xl font-medium">
-            {loaded.status === "expired"
-              ? "This bill link has expired"
-              : "Bill not found"}
-          </h1>
+          <h1 className="text-xl font-medium">Bill not found</h1>
           <p className="mt-2 text-sm text-ink-2">
-            Digital bills and downloads are available for 48 hours after purchase.
+            This digital bill link is invalid or could not be found.
           </p>
         </div>
       </main>
     );
   }
 
-  const { order, items, payments, expiresAt } = loaded;
+  const { order, items, payments } = loaded;
   const sigParam = encodeURIComponent(s ?? "");
   const downloadHref = `/api/bill-image/${order.id}?s=${sigParam}&download=1`;
 
@@ -194,10 +190,6 @@ export default async function PublicBillPage({ params, searchParams }: BillPageP
           </a>
           <PrintButton />
         </div>
-
-        <p className="text-center font-mono text-xs text-ink-3 print:hidden">
-          Link expires {formatIstDateTime(expiresAt)}
-        </p>
       </div>
     </main>
   );

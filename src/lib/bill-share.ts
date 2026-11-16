@@ -6,8 +6,6 @@ import { getDb } from "@/db";
 import { orderItems, orders, payments } from "@/db/schema";
 import { uuidSchema } from "./validators";
 
-export const BILL_TTL_MS = 48 * 60 * 60 * 1000;
-
 function getSigningSecret(): string {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 16) {
@@ -34,14 +32,6 @@ export function verifyBillSignature(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export function getBillExpiresAt(placedAt: Date): Date {
-  return new Date(placedAt.getTime() + BILL_TTL_MS);
-}
-
-export function isBillExpired(placedAt: Date): boolean {
-  return Date.now() - placedAt.getTime() > BILL_TTL_MS;
-}
-
 export async function loadSignedOrder(
   orderId: string,
   sig: string | undefined | null,
@@ -59,11 +49,6 @@ export async function loadSignedOrder(
 
   if (!order) return { status: "not_found" as const };
 
-  const expiresAt = getBillExpiresAt(order.placedAt);
-  if (isBillExpired(order.placedAt)) {
-    return { status: "expired" as const, expiresAt };
-  }
-
   const [items, paymentRows] = await Promise.all([
     db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
     db.select().from(payments).where(eq(payments.orderId, order.id)),
@@ -74,6 +59,5 @@ export async function loadSignedOrder(
     order,
     items,
     payments: paymentRows,
-    expiresAt,
   };
 }

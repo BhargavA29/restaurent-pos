@@ -87,7 +87,7 @@ function buildWhatsAppBillText(order: CompletedOrder, billUrl: string | null): s
   lines.push(`Paid via ${formatPaymentsSummary(order.payments)}`);
   if (billUrl) {
     lines.push("");
-    lines.push("Digital bill & download (valid 48h):");
+    lines.push("Digital bill & download:");
     lines.push(billUrl);
   }
   lines.push("");
@@ -558,7 +558,7 @@ function ReceiptStage({
               className="btn btn-secondary text-xs sm:text-sm"
             >
               <ExternalLink size={16} strokeWidth={1.5} aria-hidden />
-              Open 48h bill link
+              Open bill link
             </a>
           </div>
         ) : null}
