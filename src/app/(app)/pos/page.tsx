@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import { getDb } from "@/db";
 import {
@@ -6,6 +6,7 @@ import {
   categories,
   comboItems,
   combos,
+  customers,
   itemAddons,
   items,
   itemVariants,
@@ -58,6 +59,7 @@ export default async function PosPage() {
     comboRows,
     comboItemRows,
     topOrderedRows,
+    customerRows,
   ] = await Promise.all([
     db
       .select({ id: categories.id, name: categories.name })
@@ -88,6 +90,16 @@ export default async function PosPage() {
       .groupBy(orderItems.kind, orderItems.name)
       .orderBy(sql`sum(${orderItems.qty}) desc`)
       .limit(10),
+    db
+      .select({
+        phone: customers.phone,
+        name: customers.name,
+        orderCount: customers.orderCount,
+        totalSpent: customers.totalSpent,
+      })
+      .from(customers)
+      .orderBy(desc(customers.lastOrderAt))
+      .limit(5000),
   ]);
 
   const activeCategoryIds = new Set(categoryRows.map((c) => c.id));
@@ -185,6 +197,7 @@ export default async function PosPage() {
       items={posItems}
       combos={posCombos}
       initialPopular={popular}
+      initialCustomers={customerRows}
     />
   );
 }

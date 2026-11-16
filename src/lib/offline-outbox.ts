@@ -137,6 +137,13 @@ export async function removePendingOrder(id: string): Promise<void> {
   });
 }
 
+export type CustomerRecord = {
+  phone: string;
+  name: string;
+  orderCount: number;
+  totalSpent: number;
+};
+
 export async function saveCachedMenu(data: unknown): Promise<void> {
   if (typeof indexedDB === "undefined") return;
   const db = await openOfflineDb();
@@ -155,6 +162,103 @@ export async function saveCachedMenu(data: unknown): Promise<void> {
     tx.onerror = () => {
       db.close();
       reject(tx.error ?? new Error("Failed to save cached menu"));
+    };
+  });
+}
+
+const CUSTOMERS_KEY = "customers-directory";
+const MAX_LOCAL_CUSTOMERS = 5000;
+
+export async function saveLocalCustomers(customers: CustomerRecord[]): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
+  const db = await openOfflineDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(META_STORE, "readwrite");
+    tx.objectStore(META_STORE).put({
+      key: CUSTOMERS_KEY,
+      value: customers.slice(0, MAX_LOCAL_CUSTOMERS),
+    });
+
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error ?? new Error("Failed to save customer directory"));
+    };
+  });
+}
+
+export async function loadLocalCustomers(): Promise<CustomerRecord[]> {
+  if (typeof indexedDB === "undefined") return [];
+  const db = await openOfflineDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(META_STORE, "readonly");
+    const req = tx.objectStore(META_STORE).get(CUSTOMERS_KEY);
+
+    req.onsuccess = () => {
+      const value = (req.result as MetaRecord | undefined)?.value;
+      resolve(Array.isArray(value) ? (value as CustomerRecord[]) : []);
+    };
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error ?? new Error("Failed to load customer directory"));
+    };
+  });
+}
+
+export async function upsertLocalCustomer(entry: {
+  phone: string;
+  name: string;
+  orderTotal: number;
+}): Promise<void> {
+  if (typeof indexedDB === "undefined" || !entry.phone) return;
+  const db = await openOfflineDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(META_STORE, "readwrite");
+    const store = tx.objectStore(META_STORE);
+    const req = store.get(CUSTOMERS_KEY);
+
+    req.onsuccess = () => {
+      const existing = (req.result as MetaRecord | undefined)?.value;
+      const list: CustomerRecord[] = Array.isArray(existing)
+        ? (existing as CustomerRecord[])
+        : [];
+      const found = list.find((c) => c.phone === entry.phone);
+      const trimmedName = entry.name.trim();
+      const updated: CustomerRecord = found
+        ? {
+            phone: entry.phone,
+            name: trimmedName || found.name,
+            orderCount: found.orderCount + 1,
+            totalSpent: found.totalSpent + entry.orderTotal,
+          }
+        : {
+            phone: entry.phone,
+            name: trimmedName || "Customer",
+            orderCount: 1,
+            totalSpent: entry.orderTotal,
+          };
+
+      const nextList = [
+        updated,
+        ...list.filter((c) => c.phone !== entry.phone),
+      ].slice(0, MAX_LOCAL_CUSTOMERS);
+      store.put({ key: CUSTOMERS_KEY, value: nextList });
+    };
+
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error ?? new Error("Failed to update customer directory"));
     };
   });
 }

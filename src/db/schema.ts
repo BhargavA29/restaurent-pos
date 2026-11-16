@@ -157,3 +157,11 @@ export const expenses = pgTable("expenses", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid("created_by").references(() => owners.id),
 });
+
+export const customers = pgTable("customers", {
+  phone: text("phone").primaryKey(),
+  name: text("name").notNull(),
+  orderCount: integer("order_count").notNull().default(1),
+  totalSpent: integer("total_spent").notNull().default(0),
+  lastOrderAt: timestamp("last_order_at", { withTimezone: true }).notNull().defaultNow(),
+});

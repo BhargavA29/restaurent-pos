@@ -1,7 +1,7 @@
 "use client";
 
-import { Minus, Plus, Trash2 } from "lucide-react";
-import { useId } from "react";
+import { Minus, Plus, Trash2, X } from "lucide-react";
+import { useId, useMemo } from "react";
 import {
   computeCartTotals,
   computeLineTotals,
@@ -9,6 +9,7 @@ import {
   type OrderType,
 } from "@/lib/cart";
 import { formatRupees } from "@/lib/format";
+import type { CustomerRecord } from "@/lib/offline-outbox";
 import { normalizePhoneInput } from "@/lib/validators";
 
 type OrderTicketProps = {
@@ -17,9 +18,12 @@ type OrderTicketProps = {
   customerName: string;
   customerPhone: string;
   customerError?: string | null;
+  customers: CustomerRecord[];
   onOrderTypeChange: (type: OrderType) => void;
   onCustomerNameChange: (name: string) => void;
   onCustomerPhoneChange: (phone: string) => void;
+  onPickCustomer: (customer: CustomerRecord) => void;
+  onClearCustomer: () => void;
   onUpdateQty: (key: string, delta: number) => void;
   onSetDiscount: (key: string, discount: number) => void;
   onToggleComplimentary: (key: string) => void;
@@ -34,9 +38,12 @@ export function OrderTicket({
   customerName,
   customerPhone,
   customerError = null,
+  customers,
   onOrderTypeChange,
   onCustomerNameChange,
   onCustomerPhoneChange,
+  onPickCustomer,
+  onClearCustomer,
   onUpdateQty,
   onSetDiscount,
   onToggleComplimentary,
@@ -47,6 +54,21 @@ export function OrderTicket({
   const nameId = useId();
   const phoneId = useId();
   const totals = computeCartTotals(lines);
+
+  const exactCustomer = useMemo(
+    () =>
+      customerPhone.length === 10
+        ? customers.find((c) => c.phone === customerPhone)
+        : undefined,
+    [customerPhone, customers],
+  );
+
+  const phoneSuggestions = useMemo(() => {
+    if (customerPhone.length < 3 || customerPhone.length >= 10) return [];
+    return customers
+      .filter((c) => c.phone.startsWith(customerPhone))
+      .slice(0, 3);
+  }, [customerPhone, customers]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -101,49 +123,101 @@ export function OrderTicket({
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor={nameId} className="text-xs text-ink-3">
-            Customer name (optional)
-          </label>
-          <input
-            id={nameId}
-            type="text"
-            maxLength={80}
-            autoComplete="off"
-            value={customerName}
-            onChange={(e) => onCustomerNameChange(e.target.value)}
-            placeholder="Name for counter callout"
-            className="field text-sm"
-          />
+      <div className="flex flex-col gap-2.5 rounded-control border border-hairline bg-bg p-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-ink-2">Customer (optional)</span>
+          {exactCustomer ? (
+            <span className="rounded bg-accent-soft px-2 py-0.5 font-mono text-[11px] font-medium text-accent-text">
+              Returning · {exactCustomer.orderCount}{" "}
+              {exactCustomer.orderCount === 1 ? "order" : "orders"}
+            </span>
+          ) : null}
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor={phoneId} className="text-xs text-ink-3">
-            WhatsApp phone (optional)
-          </label>
-          <input
-            id={phoneId}
-            type="tel"
-            inputMode="numeric"
-            maxLength={10}
-            autoComplete="off"
-            aria-invalid={customerError ? "true" : "false"}
-            value={customerPhone}
-            onChange={(e) => {
-              onCustomerPhoneChange(normalizePhoneInput(e.target.value).slice(0, 10));
-            }}
-            placeholder="10-digit number"
-            className="field font-mono text-sm"
-          />
+        <div className="flex flex-col gap-2">
+          <div className="relative">
+            <label htmlFor={phoneId} className="sr-only">
+              WhatsApp phone number
+            </label>
+            <span
+              aria-hidden
+              className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 select-none font-mono text-xs text-ink-3"
+            >
+              +91
+            </span>
+            <input
+              id={phoneId}
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              autoComplete="off"
+              aria-invalid={customerError ? "true" : "false"}
+              value={customerPhone}
+              onChange={(e) => {
+                onCustomerPhoneChange(normalizePhoneInput(e.target.value).slice(0, 10));
+              }}
+              placeholder="WhatsApp number"
+              className="field ps-11 pe-16 font-mono text-sm"
+            />
+            {customerPhone.length > 0 || customerName.length > 0 ? (
+              <div className="absolute inset-y-0 end-1.5 flex items-center gap-1">
+                {customerPhone.length > 0 && customerPhone.length < 10 ? (
+                  <span className="font-mono text-[11px] text-ink-3">
+                    {customerPhone.length}/10
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  aria-label="Clear customer details"
+                  onClick={onClearCustomer}
+                  className="grid size-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-raised hover:text-ink"
+                >
+                  <X size={14} strokeWidth={1.5} aria-hidden />
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {phoneSuggestions.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {phoneSuggestions.map((match) => (
+                <button
+                  key={match.phone}
+                  type="button"
+                  onClick={() => onPickCustomer(match)}
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-hairline-strong bg-card px-2.5 text-xs text-ink transition-colors hover:border-accent"
+                >
+                  <span className="font-mono">{match.phone}</span>
+                  <span className="text-ink-3">·</span>
+                  <span className="truncate font-medium">{match.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div>
+            <label htmlFor={nameId} className="sr-only">
+              Customer name
+            </label>
+            <input
+              id={nameId}
+              type="text"
+              maxLength={80}
+              autoComplete="off"
+              value={customerName}
+              onChange={(e) => onCustomerNameChange(e.target.value)}
+              placeholder="Customer name for callout"
+              className="field text-sm"
+            />
+          </div>
         </div>
+
+        {customerError ? (
+          <p role="alert" className="text-xs text-negative">
+            {customerError}
+          </p>
+        ) : null}
       </div>
-
-      {customerError ? (
-        <p role="alert" className="-mt-2 text-xs text-negative">
-          {customerError}
-        </p>
-      ) : null}
 
       {lines.length === 0 ? (
         <div className="rounded-control border border-dashed border-hairline px-4 py-8 text-center text-sm text-ink-3">

@@ -1,4 +1,4 @@
-const CACHE_NAME = "fry-pos-v1";
+const CACHE_NAME = "fry-pos-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -32,13 +32,17 @@ self.addEventListener("fetch", (event) => {
   if (isStaticAsset) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
-        const cached = await cache.match(request);
-        if (cached) return cached;
-        const response = await fetch(request);
-        if (response.ok) {
-          void cache.put(request, response.clone());
+        try {
+          const response = await fetch(request);
+          if (response.ok) {
+            void cache.put(request, response.clone());
+          }
+          return response;
+        } catch {
+          const cached = await cache.match(request);
+          if (cached) return cached;
+          return new Response("", { status: 504 });
         }
-        return response;
       }),
     );
     return;

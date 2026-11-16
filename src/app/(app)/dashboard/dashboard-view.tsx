@@ -1,11 +1,19 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ExternalLink, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  MessageCircle,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 import { type OrderType } from "@/lib/cart";
 import { formatIstDateTime, formatRupees, ORDER_TYPE_LABEL } from "@/lib/format";
-import { expenseSchema, parseRupeesInput } from "@/lib/validators";
+import { expenseSchema, parseRupeesInput, type PaymentMode } from "@/lib/validators";
 import { deleteExpense, saveExpense } from "./actions";
 
 export type DayRevenuePoint = {
@@ -41,6 +49,21 @@ export type DayBillRow = {
   placedAtIso: string;
 };
 
+export type HourlyBucket = {
+  hour: number;
+  label: string;
+  orderCount: number;
+  revenue: number;
+};
+
+export type DashboardCustomerRow = {
+  phone: string;
+  name: string;
+  orderCount: number;
+  totalSpent: number;
+  lastOrderAtIso: string;
+};
+
 type DashboardViewProps = {
   selectedDate: string;
   selectedDateLabel: string;
@@ -51,12 +74,20 @@ type DashboardViewProps = {
   topItems: TopSellingRow[];
   initialExpenses: ExpenseItem[];
   bills: DayBillRow[];
+  paymentTotals: Record<PaymentMode, number>;
+  hourlyBreakdown: HourlyBucket[];
+  customers: DashboardCustomerRow[];
 };
 
 const timeOnlyFormatter = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
   timeStyle: "short",
 });
+
+function csvCell(value: string | number): string {
+  const s = String(value);
+  return `"${s.replace(/"/g, '""')}"`;
+}
 
 export function DashboardView({
   selectedDate,
@@ -68,6 +99,9 @@ export function DashboardView({
   topItems,
   initialExpenses,
   bills,
+  paymentTotals,
+  hourlyBreakdown,
+  customers,
 }: DashboardViewProps) {
   const router = useRouter();
   const dateInputId = useId();
@@ -84,6 +118,7 @@ export function DashboardView({
 
   const dayRevenue = todayPoint?.revenue ?? 0;
   const dayOrderCount = todayPoint?.orderCount ?? 0;
+  const avgBill = dayOrderCount > 0 ? Math.round(dayRevenue / dayOrderCount) : 0;
   const yesterdayRevenue = yesterdayPoint?.revenue ?? 0;
 
   const expenseTotal = useMemo(
@@ -91,6 +126,7 @@ export function DashboardView({
     [expenses],
   );
   const netAfterExpenses = dayRevenue - expenseTotal;
+  const expectedCashInDrawer = paymentTotals.cash - expenseTotal;
 
   const sevenDayTotal = useMemo(
     () => sevenDays.reduce((sum, d) => sum + d.revenue, 0),
@@ -104,10 +140,76 @@ export function DashboardView({
     () => Math.max(...topItems.map((i) => i.qty), 1),
     [topItems],
   );
+  const maxHourOrders = useMemo(
+    () => Math.max(...hourlyBreakdown.map((h) => h.orderCount), 1),
+    [hourlyBreakdown],
+  );
+  const peakHour = useMemo(() => {
+    if (hourlyBreakdown.length === 0) return null;
+    return hourlyBreakdown.reduce((best, cur) =>
+      cur.orderCount > best.orderCount ||
+      (cur.orderCount === best.orderCount && cur.revenue > best.revenue)
+        ? cur
+        : best,
+    );
+  }, [hourlyBreakdown]);
 
   function goToDate(date: string) {
     if (!date) return;
     router.push(date === todayDate ? "/dashboard" : `/dashboard?date=${date}`);
+  }
+
+  function handleExportCsv() {
+    const rows: string[] = [];
+    const push = (...cols: (string | number)[]) => {
+      rows.push(cols.map(csvCell).join(","));
+    };
+
+    push("FRY Daily Summary", selectedDate);
+    push("Metric", "Value");
+    push("Total Revenue (INR)", dayRevenue);
+    push("Orders", dayOrderCount);
+    push("Average Bill (INR)", avgBill);
+    push("UPI Collected (INR)", paymentTotals.upi);
+    push("Card Collected (INR)", paymentTotals.card);
+    push("Cash Sales (INR)", paymentTotals.cash);
+    push("Daily Expenses (INR)", expenseTotal);
+    push("Expected Cash in Drawer (INR)", expectedCashInDrawer);
+    push("Net After Expenses (INR)", netAfterExpenses);
+
+    rows.push("");
+    push("Top-Selling Items", "Variant", "Qty", "Revenue (INR)");
+    for (const item of topItems) {
+      push(item.name, item.variantName ?? "", item.qty, item.revenue);
+    }
+
+    rows.push("");
+    push("Bills", "Time (IST)", "Order Type", "Customer", "Total (INR)");
+    for (const bill of bills) {
+      push(
+        `#${bill.billNo}`,
+        formatIstDateTime(bill.placedAtIso),
+        ORDER_TYPE_LABEL[bill.type],
+        bill.customerName ?? "",
+        bill.total,
+      );
+    }
+
+    rows.push("");
+    push("Expenses", "Time (IST)", "Amount (INR)");
+    for (const exp of expenses) {
+      push(exp.description, timeOnlyFormatter.format(new Date(exp.createdAtIso)), exp.amount);
+    }
+
+    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `FRY-Summary-${selectedDate}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   function handleAddExpense(e: React.FormEvent) {
@@ -227,6 +329,15 @@ export function DashboardView({
               Today
             </button>
           ) : null}
+
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="btn btn-secondary min-h-11 px-3.5 text-sm"
+          >
+            <Download size={16} strokeWidth={1.5} aria-hidden />
+            Export CSV
+          </button>
         </div>
       </header>
 
@@ -240,7 +351,8 @@ export function DashboardView({
             {formatRupees(dayRevenue)}
           </p>
           <p className="mt-2.5 text-xs text-ink-3">
-            {dayOrderCount} {dayOrderCount === 1 ? "order" : "orders"} · {revenueDeltaLabel}
+            {dayOrderCount} {dayOrderCount === 1 ? "order" : "orders"} ·{" "}
+            {formatRupees(avgBill)} avg bill · {revenueDeltaLabel}
           </p>
         </div>
 
@@ -562,6 +674,159 @@ export function DashboardView({
             </ul>
           )}
         </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="rounded-card border border-hairline bg-card p-5 md:p-6">
+          <div className="flex items-baseline justify-between gap-2">
+            <div>
+              <h2 className="text-base font-medium">Cash drawer &amp; payment tally</h2>
+              <p className="mt-0.5 text-xs text-ink-3">
+                Verify UPI, card, and physical cash at closing
+              </p>
+            </div>
+          </div>
+
+          <dl className="mt-4 divide-y divide-hairline rounded-control border border-hairline bg-bg text-sm">
+            <div className="flex items-center justify-between px-4 py-3">
+              <dt className="text-ink-2">UPI collected</dt>
+              <dd className="font-mono font-medium">{formatRupees(paymentTotals.upi)}</dd>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <dt className="text-ink-2">Card collected</dt>
+              <dd className="font-mono font-medium">{formatRupees(paymentTotals.card)}</dd>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <dt className="text-ink-2">Cash sales</dt>
+              <dd className="font-mono font-medium">{formatRupees(paymentTotals.cash)}</dd>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <dt className="text-ink-2">Less: Daily expenses</dt>
+              <dd className="font-mono text-negative">-{formatRupees(expenseTotal)}</dd>
+            </div>
+            <div className="flex items-center justify-between bg-raised/60 px-4 py-3.5">
+              <dt className="font-medium text-ink">Expected cash in drawer</dt>
+              <dd
+                className={`font-mono text-lg font-medium ${
+                  expectedCashInDrawer < 0 ? "text-negative" : "text-ink"
+                }`}
+              >
+                {expectedCashInDrawer < 0
+                  ? `-${formatRupees(Math.abs(expectedCashInDrawer))}`
+                  : formatRupees(expectedCashInDrawer)}
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="rounded-card border border-hairline bg-card p-5 md:p-6">
+          <div className="flex items-baseline justify-between gap-2">
+            <div>
+              <h2 className="text-base font-medium">Peak hours</h2>
+              <p className="mt-0.5 text-xs text-ink-3">
+                Rush-hour order volume across the day
+              </p>
+            </div>
+            {peakHour ? (
+              <span className="rounded bg-accent-soft px-2 py-0.5 font-mono text-xs font-medium text-accent-text">
+                Peak: {peakHour.label}
+              </span>
+            ) : null}
+          </div>
+
+          {hourlyBreakdown.length === 0 ? (
+            <p className="mt-6 text-sm text-ink-3">No orders yet to show peak hours</p>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-3">
+              {hourlyBreakdown.map((bucket) => {
+                const widthPct = Math.max(
+                  6,
+                  Math.round((bucket.orderCount / maxHourOrders) * 100),
+                );
+                const isPeak = peakHour?.hour === bucket.hour;
+                return (
+                  <li key={bucket.hour} className="flex flex-col gap-1">
+                    <div className="flex items-baseline justify-between gap-2 text-xs">
+                      <span className={isPeak ? "font-medium text-ink" : "text-ink-2"}>
+                        {bucket.label}
+                      </span>
+                      <span className="font-mono text-ink-2">
+                        {bucket.orderCount}{" "}
+                        {bucket.orderCount === 1 ? "order" : "orders"} ·{" "}
+                        {formatRupees(bucket.revenue)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-raised">
+                      <div
+                        style={{ width: `${widthPct}%` }}
+                        className={`h-full rounded-full ${
+                          isPeak ? "bg-accent" : "bg-ink-3/50"
+                        }`}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-card border border-hairline bg-card p-5 md:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h2 className="text-base font-medium">Customers</h2>
+            <p className="mt-0.5 text-xs text-ink-3">
+              Saved from orders and cached on the counter device for instant phone lookup
+            </p>
+          </div>
+          <span className="font-mono text-xs text-ink-3">{customers.length}</span>
+        </div>
+
+        {customers.length === 0 ? (
+          <p className="mt-6 text-sm text-ink-3">
+            No saved customer phone numbers yet
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto rounded-control border border-hairline bg-bg">
+            <table className="w-full min-w-[34rem] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-xs text-ink-3">
+                  <th className="px-4 py-2.5 font-medium">Customer</th>
+                  <th className="px-4 py-2.5 font-medium">WhatsApp</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Orders</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Total spent</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Last order</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                {customers.map((customer) => (
+                  <tr key={customer.phone}>
+                    <td className="px-4 py-3 font-medium text-ink">{customer.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      <a
+                        href={`https://wa.me/91${customer.phone}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-accent-text hover:underline"
+                      >
+                        <MessageCircle size={13} strokeWidth={1.5} aria-hidden />
+                        +91 {customer.phone}
+                      </a>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">{customer.orderCount}</td>
+                    <td className="px-4 py-3 text-right font-mono font-medium">
+                      {formatRupees(customer.totalSpent)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-xs text-ink-3">
+                      {formatIstDateTime(customer.lastOrderAtIso)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );

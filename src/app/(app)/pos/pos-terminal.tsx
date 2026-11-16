@@ -12,7 +12,13 @@ import {
   type OrderType,
 } from "@/lib/cart";
 import { formatRupees } from "@/lib/format";
-import { saveCachedMenu } from "@/lib/offline-outbox";
+import {
+  loadLocalCustomers,
+  saveCachedMenu,
+  saveLocalCustomers,
+  upsertLocalCustomer,
+  type CustomerRecord,
+} from "@/lib/offline-outbox";
 import { customerInfoSchema } from "@/lib/validators";
 import { CheckoutModal, KotPrintSlip, type CompletedOrder } from "./checkout-modal";
 import { CustomizeItemModal, type PosItem } from "./customize-modal";
@@ -48,6 +54,7 @@ type PosTerminalProps = {
   items: PosItem[];
   combos: PosCombo[];
   initialPopular: PopularShortcut[];
+  initialCustomers: CustomerRecord[];
 };
 
 export function PosTerminal({
@@ -55,13 +62,16 @@ export function PosTerminal({
   items,
   combos,
   initialPopular,
+  initialCustomers,
 }: PosTerminalProps) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [orderType, setOrderType] = useState<OrderType>("takeaway");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [autoFilledName, setAutoFilledName] = useState<string | null>(null);
   const [customerError, setCustomerError] = useState<string | null>(null);
 
+  const [customers, setCustomers] = useState<CustomerRecord[]>(initialCustomers);
   const [popular, setPopular] = useState<PopularShortcut[]>(initialPopular);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -97,6 +107,35 @@ export function PosTerminal({
   useEffect(() => {
     void saveCachedMenu({ categories, items, combos, initialPopular }).catch(() => {});
   }, [categories, items, combos, initialPopular]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cached = await loadLocalCustomers();
+        if (cancelled) return;
+        const merged = new Map<string, CustomerRecord>();
+        for (const c of cached) merged.set(c.phone, c);
+        for (const c of initialCustomers) {
+          const prev = merged.get(c.phone);
+          if (!prev || c.orderCount >= prev.orderCount) merged.set(c.phone, c);
+        }
+        const list = Array.from(merged.values());
+        setCustomers(list);
+        await saveLocalCustomers(list);
+      } catch {
+        // IndexedDB unavailable; server snapshot in state still works.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialCustomers]);
+
+  const customersByPhone = useMemo(
+    () => new Map(customers.map((c) => [c.phone, c])),
+    [customers],
+  );
 
   const qtyBySource = useMemo(() => {
     const map = new Map<string, number>();
@@ -209,11 +248,39 @@ export function PosTerminal({
     );
   }
 
-  function clearCart() {
-    setLines([]);
+  function clearCustomer() {
     setCustomerName("");
     setCustomerPhone("");
+    setAutoFilledName(null);
     setCustomerError(null);
+  }
+
+  function handleCustomerPhoneChange(nextPhone: string) {
+    setCustomerPhone(nextPhone);
+    if (customerError) setCustomerError(null);
+
+    const match = nextPhone.length === 10 ? customersByPhone.get(nextPhone) : undefined;
+    if (match) {
+      if (!customerName.trim() || customerName === autoFilledName) {
+        setCustomerName(match.name);
+        setAutoFilledName(match.name);
+      }
+    } else if (autoFilledName && customerName === autoFilledName) {
+      setCustomerName("");
+      setAutoFilledName(null);
+    }
+  }
+
+  function handlePickCustomer(customer: CustomerRecord) {
+    setCustomerPhone(customer.phone);
+    setCustomerName(customer.name);
+    setAutoFilledName(customer.name);
+    if (customerError) setCustomerError(null);
+  }
+
+  function clearCart() {
+    setLines([]);
+    clearCustomer();
     setMobileCartOpen(false);
   }
 
@@ -235,9 +302,33 @@ export function PosTerminal({
     setCompletedOrder(completed);
     setLastPrintableOrder(completed);
     setLines([]);
-    setCustomerName("");
-    setCustomerPhone("");
-    setCustomerError(null);
+    clearCustomer();
+
+    if (completed.customerPhone) {
+      const trimmedName = completed.customerName.trim();
+      setCustomers((prev) => {
+        const existing = prev.find((c) => c.phone === completed.customerPhone);
+        const updated: CustomerRecord = existing
+          ? {
+              phone: completed.customerPhone,
+              name: trimmedName || existing.name,
+              orderCount: existing.orderCount + 1,
+              totalSpent: existing.totalSpent + completed.total,
+            }
+          : {
+              phone: completed.customerPhone,
+              name: trimmedName || "Customer",
+              orderCount: 1,
+              totalSpent: completed.total,
+            };
+        return [updated, ...prev.filter((c) => c.phone !== completed.customerPhone)];
+      });
+      void upsertLocalCustomer({
+        phone: completed.customerPhone,
+        name: trimmedName,
+        orderTotal: completed.total,
+      }).catch(() => {});
+    }
 
     const qtyAddedByKey = new Map<string, number>();
     for (const line of completed.items) {
@@ -256,6 +347,29 @@ export function PosTerminal({
 
   const totals = computeCartTotals(lines);
   const hasMenu = items.length > 0 || combos.length > 0;
+
+  const sharedTicketProps = {
+    lines,
+    orderType,
+    customerName,
+    customerPhone,
+    customerError,
+    customers,
+    onOrderTypeChange: setOrderType,
+    onCustomerNameChange: (v: string) => {
+      setCustomerName(v);
+      setAutoFilledName(null);
+      if (customerError) setCustomerError(null);
+    },
+    onCustomerPhoneChange: handleCustomerPhoneChange,
+    onPickCustomer: handlePickCustomer,
+    onClearCustomer: clearCustomer,
+    onUpdateQty: updateQty,
+    onSetDiscount: setDiscount,
+    onToggleComplimentary: toggleComplimentary,
+    onClearCart: clearCart,
+    onCharge: handleCharge,
+  };
 
   return (
     <div className={totals.itemCount > 0 ? "pb-20 lg:pb-0" : undefined}>
@@ -481,27 +595,7 @@ export function PosTerminal({
         </section>
 
         <aside className="hidden rounded-card border border-hairline bg-card p-5 lg:sticky lg:top-6 lg:block">
-          <OrderTicket
-            lines={lines}
-            orderType={orderType}
-            customerName={customerName}
-            customerPhone={customerPhone}
-            customerError={customerError}
-            onOrderTypeChange={setOrderType}
-            onCustomerNameChange={(v) => {
-              setCustomerName(v);
-              if (customerError) setCustomerError(null);
-            }}
-            onCustomerPhoneChange={(v) => {
-              setCustomerPhone(v);
-              if (customerError) setCustomerError(null);
-            }}
-            onUpdateQty={updateQty}
-            onSetDiscount={setDiscount}
-            onToggleComplimentary={toggleComplimentary}
-            onClearCart={clearCart}
-            onCharge={handleCharge}
-          />
+          <OrderTicket {...sharedTicketProps} />
         </aside>
       </div>
 
@@ -532,28 +626,7 @@ export function PosTerminal({
         titleId={mobileModalTitleId}
         title="Current order"
       >
-        <OrderTicket
-          inModal
-          lines={lines}
-          orderType={orderType}
-          customerName={customerName}
-          customerPhone={customerPhone}
-          customerError={customerError}
-          onOrderTypeChange={setOrderType}
-          onCustomerNameChange={(v) => {
-            setCustomerName(v);
-            if (customerError) setCustomerError(null);
-          }}
-          onCustomerPhoneChange={(v) => {
-            setCustomerPhone(v);
-            if (customerError) setCustomerError(null);
-          }}
-          onUpdateQty={updateQty}
-          onSetDiscount={setDiscount}
-          onToggleComplimentary={toggleComplimentary}
-          onClearCart={clearCart}
-          onCharge={handleCharge}
-        />
+        <OrderTicket inModal {...sharedTicketProps} />
       </Modal>
 
       <CustomizeItemModal

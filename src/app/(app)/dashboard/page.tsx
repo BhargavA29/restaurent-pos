@@ -1,15 +1,17 @@
 import { between, desc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import { getDb } from "@/db";
-import { expenses, orderItems, orders } from "@/db/schema";
+import { customers, expenses, orderItems, orders, payments } from "@/db/schema";
 import { requireOwner } from "@/lib/auth";
 import { signBillId } from "@/lib/bill-share";
-import { isoDateSchema } from "@/lib/validators";
+import { isoDateSchema, type PaymentMode } from "@/lib/validators";
 import {
   DashboardView,
+  type DashboardCustomerRow,
   type DayBillRow,
   type DayRevenuePoint,
   type ExpenseItem,
+  type HourlyBucket,
   type TopSellingRow,
 } from "./dashboard-view";
 
@@ -17,6 +19,12 @@ export const metadata: Metadata = { title: "Dashboard" };
 
 const istDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Kolkata",
+});
+
+const istHourFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Kolkata",
+  hour: "numeric",
+  hour12: false,
 });
 
 const fullDateFormatter = new Intl.DateTimeFormat("en-IN", {
@@ -43,6 +51,16 @@ function shiftIsoDate(iso: string, deltaDays: number): string {
   return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10);
 }
 
+function formatHourRange(hour: number): string {
+  const fmt = (h: number) => {
+    const normalized = ((h % 24) + 24) % 24;
+    if (normalized === 0) return "12 AM";
+    if (normalized === 12) return "12 PM";
+    return normalized < 12 ? `${normalized} AM` : `${normalized - 12} PM`;
+  };
+  return `${fmt(hour)} – ${fmt(hour + 1)}`;
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -56,52 +74,63 @@ export default async function DashboardPage({
   const dates = Array.from({ length: 7 }, (_, i) => shiftIsoDate(selectedDate, i - 6));
   const db = getDb();
 
-  const [dailyRows, topRows, expenseRows, billRows] = await Promise.all([
-    db
-      .select({
-        businessDate: orders.businessDate,
-        revenue: sql<number>`coalesce(sum(${orders.total}), 0)::int`,
-        orderCount: sql<number>`count(*)::int`,
-      })
-      .from(orders)
-      .where(between(orders.businessDate, dates[0], selectedDate))
-      .groupBy(orders.businessDate),
-    db
-      .select({
-        name: orderItems.name,
-        variantName: orderItems.variantName,
-        qty: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int`,
-        revenue: sql<number>`coalesce(sum(${orderItems.lineTotal}), 0)::int`,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .where(eq(orders.businessDate, selectedDate))
-      .groupBy(orderItems.name, orderItems.variantName)
-      .orderBy(sql`sum(${orderItems.qty}) desc`, sql`sum(${orderItems.lineTotal}) desc`),
-    db
-      .select({
-        id: expenses.id,
-        spentOn: expenses.spentOn,
-        description: expenses.description,
-        amount: expenses.amount,
-        createdAt: expenses.createdAt,
-      })
-      .from(expenses)
-      .where(eq(expenses.spentOn, selectedDate))
-      .orderBy(desc(expenses.createdAt)),
-    db
-      .select({
-        id: orders.id,
-        billNo: orders.billNo,
-        type: orders.type,
-        customerName: orders.customerName,
-        total: orders.total,
-        placedAt: orders.placedAt,
-      })
-      .from(orders)
-      .where(eq(orders.businessDate, selectedDate))
-      .orderBy(desc(orders.billNo)),
-  ]);
+  const [dailyRows, topRows, expenseRows, billRows, paymentRows, customerRows] =
+    await Promise.all([
+      db
+        .select({
+          businessDate: orders.businessDate,
+          revenue: sql<number>`coalesce(sum(${orders.total}), 0)::int`,
+          orderCount: sql<number>`count(*)::int`,
+        })
+        .from(orders)
+        .where(between(orders.businessDate, dates[0], selectedDate))
+        .groupBy(orders.businessDate),
+      db
+        .select({
+          name: orderItems.name,
+          variantName: orderItems.variantName,
+          qty: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int`,
+          revenue: sql<number>`coalesce(sum(${orderItems.lineTotal}), 0)::int`,
+        })
+        .from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(eq(orders.businessDate, selectedDate))
+        .groupBy(orderItems.name, orderItems.variantName)
+        .orderBy(sql`sum(${orderItems.qty}) desc`, sql`sum(${orderItems.lineTotal}) desc`),
+      db
+        .select({
+          id: expenses.id,
+          spentOn: expenses.spentOn,
+          description: expenses.description,
+          amount: expenses.amount,
+          createdAt: expenses.createdAt,
+        })
+        .from(expenses)
+        .where(eq(expenses.spentOn, selectedDate))
+        .orderBy(desc(expenses.createdAt)),
+      db
+        .select({
+          id: orders.id,
+          billNo: orders.billNo,
+          type: orders.type,
+          customerName: orders.customerName,
+          total: orders.total,
+          placedAt: orders.placedAt,
+        })
+        .from(orders)
+        .where(eq(orders.businessDate, selectedDate))
+        .orderBy(desc(orders.billNo)),
+      db
+        .select({
+          mode: payments.mode,
+          amount: sql<number>`coalesce(sum(${payments.amount}), 0)::int`,
+        })
+        .from(payments)
+        .innerJoin(orders, eq(payments.orderId, orders.id))
+        .where(eq(orders.businessDate, selectedDate))
+        .groupBy(payments.mode),
+      db.select().from(customers).orderBy(desc(customers.lastOrderAt)).limit(50),
+    ]);
 
   const dailyByDate = new Map(dailyRows.map((r) => [r.businessDate, r]));
 
@@ -136,6 +165,43 @@ export default async function DashboardPage({
     placedAtIso: b.placedAt.toISOString(),
   }));
 
+  const paymentTotals: Record<PaymentMode, number> = {
+    cash: 0,
+    upi: 0,
+    card: 0,
+  };
+  for (const row of paymentRows) {
+    paymentTotals[row.mode] = row.amount;
+  }
+
+  const hourlyMap = new Map<number, { orderCount: number; revenue: number }>();
+  for (const bill of billRows) {
+    const hourRaw = Number.parseInt(istHourFormatter.format(bill.placedAt), 10);
+    const hour = Number.isFinite(hourRaw) ? hourRaw % 24 : 0;
+    const prev = hourlyMap.get(hour) ?? { orderCount: 0, revenue: 0 };
+    hourlyMap.set(hour, {
+      orderCount: prev.orderCount + 1,
+      revenue: prev.revenue + bill.total,
+    });
+  }
+
+  const hourlyBreakdown: HourlyBucket[] = Array.from(hourlyMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([hour, stats]) => ({
+      hour,
+      label: formatHourRange(hour),
+      orderCount: stats.orderCount,
+      revenue: stats.revenue,
+    }));
+
+  const customerList: DashboardCustomerRow[] = customerRows.map((c) => ({
+    phone: c.phone,
+    name: c.name,
+    orderCount: c.orderCount,
+    totalSpent: c.totalSpent,
+    lastOrderAtIso: c.lastOrderAt.toISOString(),
+  }));
+
   return (
     <DashboardView
       key={selectedDate}
@@ -148,6 +214,9 @@ export default async function DashboardPage({
       topItems={topItems}
       initialExpenses={initialExpenses}
       bills={bills}
+      paymentTotals={paymentTotals}
+      hourlyBreakdown={hourlyBreakdown}
+      customers={customerList}
     />
   );
 }

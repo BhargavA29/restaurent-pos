@@ -1,9 +1,9 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { orderItems, orders, payments } from "@/db/schema";
+import { customers, orderItems, orders, payments } from "@/db/schema";
 import { requireOwner } from "@/lib/auth";
 import { signBillId } from "@/lib/bill-share";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/validators";
@@ -76,6 +76,29 @@ export async function placeOrder(input: CreateOrderInput): Promise<PlaceOrderRes
               .map((p) => ({ orderId: data.id, mode: p.mode, amount: p.amount }));
 
       await tx.insert(payments).values(paymentRows);
+
+      if (data.customerPhone) {
+        const trimmedName = data.customerName.trim();
+        await tx
+          .insert(customers)
+          .values({
+            phone: data.customerPhone,
+            name: trimmedName || "Customer",
+            orderCount: 1,
+            totalSpent: data.total,
+            lastOrderAt: placedAt,
+          })
+          .onConflictDoUpdate({
+            target: customers.phone,
+            set: {
+              name: trimmedName ? trimmedName : customers.name,
+              orderCount: sql`${customers.orderCount} + 1`,
+              totalSpent: sql`${customers.totalSpent} + ${data.total}`,
+              lastOrderAt: placedAt,
+            },
+          });
+      }
+
       return inserted.billNo;
     });
 
