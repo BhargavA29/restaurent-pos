@@ -44,7 +44,7 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     await signSession({ ownerId: owner.id, name: owner.name }),
     sessionCookieOptions,
   );
-  redirect("/pos");
+  redirect("/live");
 }
 
 export async function logout() {

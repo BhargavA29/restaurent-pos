@@ -178,7 +178,7 @@ export function PosTerminal({
 
   function handleItemTap(item: PosItem) {
     if (item.soldOut) return;
-    if (item.variants.length > 0 || item.addons.length > 0) {
+    if (item.variants.length > 0) {
       setCustomizing(item);
       return;
     }
@@ -414,35 +414,37 @@ export function PosTerminal({
             </div>
           ) : (
             <>
-              <div
-                role="tablist"
-                aria-label="Menu categories"
-                className="flex gap-2 overflow-x-auto pb-1"
-              >
-                {[
-                  { id: "all", label: "All" },
-                  ...(combos.length > 0 ? [{ id: "combos", label: "Combos" }] : []),
-                  ...categories.map((c) => ({ id: c.id, label: c.name })),
-                ].map((tab) => {
-                  const selected = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={selected}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`min-h-11 shrink-0 rounded-control border px-4 text-sm font-medium transition-colors ${
-                        selected
-                          ? "border-accent bg-accent text-white"
-                          : "border-hairline bg-card text-ink-2 hover:border-ink-3 hover:text-ink"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
+              {categories.length > 1 || combos.length > 0 ? (
+                <div
+                  role="tablist"
+                  aria-label="Menu categories"
+                  className="flex gap-2 overflow-x-auto pb-1"
+                >
+                  {[
+                    { id: "all", label: "All" },
+                    ...(combos.length > 0 ? [{ id: "combos", label: "Combos" }] : []),
+                    ...categories.map((c) => ({ id: c.id, label: c.name })),
+                  ].map((tab) => {
+                    const selected = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`min-h-11 shrink-0 rounded-control border px-4 text-sm font-medium transition-colors ${
+                          selected
+                            ? "border-accent bg-accent text-white"
+                            : "border-hairline bg-card text-ink-2 hover:border-ink-3 hover:text-ink"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
 
               {activeTab === "all" && !query && popular.length > 0 ? (
                 <div className="flex flex-col gap-2.5">
@@ -549,43 +551,67 @@ export function PosTerminal({
                         : [item.price];
                     const minPrice = Math.min(...prices);
                     const hasMultiplePrices = new Set(prices).size > 1;
-                    const isCustomizable = item.variants.length > 0 || item.addons.length > 0;
+                    const hasVariants = item.variants.length > 0;
+                    const hasDips = item.addons.length > 0;
 
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        type="button"
-                        disabled={item.soldOut}
-                        onClick={() => handleItemTap(item)}
-                        className="flex min-h-28 flex-col justify-between gap-2 rounded-card border border-hairline bg-card p-3.5 text-left transition-colors hover:border-ink-3 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                        className={`flex min-h-28 flex-col justify-between gap-2 rounded-card border border-hairline bg-card p-3.5 transition-colors hover:border-ink-3 ${
+                          item.soldOut ? "opacity-50" : ""
+                        }`}
                       >
-                        <div className="flex w-full items-start justify-between gap-2">
-                          <span className="font-medium leading-snug text-ink">{item.name}</span>
-                          {countInCart > 0 ? (
-                            <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
-                              {countInCart}
+                        <button
+                          type="button"
+                          disabled={item.soldOut}
+                          onClick={() => handleItemTap(item)}
+                          className="flex flex-1 flex-col justify-between gap-2 text-left active:scale-[0.99] disabled:cursor-not-allowed"
+                        >
+                          <div className="flex w-full items-start justify-between gap-2">
+                            <span className="font-medium leading-snug text-ink">
+                              {item.name}
                             </span>
-                          ) : null}
-                        </div>
+                            {countInCart > 0 ? (
+                              <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
+                                {countInCart}
+                              </span>
+                            ) : null}
+                          </div>
+                        </button>
 
-                        <div className="flex w-full items-end justify-between gap-2 pt-1">
-                          {item.soldOut ? (
-                            <span className="text-xs font-medium text-negative">Sold out</span>
-                          ) : (
-                            <span className="font-mono text-sm font-medium text-ink">
-                              {formatRupees(minPrice)}
-                              {hasMultiplePrices ? "+" : ""}
-                            </span>
-                          )}
-                          {!item.soldOut && isCustomizable ? (
+                        <div className="flex w-full items-center justify-between gap-2 pt-1">
+                          <button
+                            type="button"
+                            disabled={item.soldOut}
+                            onClick={() => handleItemTap(item)}
+                            className="text-left disabled:cursor-not-allowed"
+                          >
+                            {item.soldOut ? (
+                              <span className="text-xs font-medium text-negative">Sold out</span>
+                            ) : (
+                              <span className="font-mono text-sm font-medium text-ink">
+                                {formatRupees(minPrice)}
+                                {hasMultiplePrices ? "+" : ""}
+                              </span>
+                            )}
+                          </button>
+
+                          {!item.soldOut && hasVariants ? (
                             <span className="text-xs text-ink-3">
-                              {item.variants.length > 0
-                                ? `${item.variants.length} sizes`
-                                : "Add-ons"}
+                              {item.variants.length} sizes
                             </span>
+                          ) : !item.soldOut && hasDips ? (
+                            <button
+                              type="button"
+                              aria-label={`Add dips for ${item.name}`}
+                              onClick={() => setCustomizing(item)}
+                              className="inline-flex min-h-8 items-center rounded-control border border-hairline-strong bg-bg px-2.5 text-xs font-medium text-accent-text transition-colors hover:border-accent"
+                            >
+                              + Dips
+                            </button>
                           ) : null}
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>

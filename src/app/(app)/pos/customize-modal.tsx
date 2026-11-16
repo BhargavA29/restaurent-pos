@@ -107,7 +107,7 @@ function CustomizeForm({
 
       {item.addons.length > 0 ? (
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm text-ink-2">Add-ons</legend>
+          <legend className="mb-1 text-sm text-ink-2">Dips &amp; add-ons</legend>
           <div className="flex flex-col gap-2">
             {item.addons.map((addon) => {
               const checked = selectedAddonIds.includes(addon.id);

@@ -16,7 +16,7 @@ export async function proxy(request: NextRequest) {
   }
   if (pathname === "/login") {
     return session
-      ? NextResponse.redirect(new URL("/pos", request.url))
+      ? NextResponse.redirect(new URL("/live", request.url))
       : NextResponse.next();
   }
   if (!session) {

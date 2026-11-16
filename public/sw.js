@@ -1,4 +1,4 @@
-const CACHE_NAME = "fry-pos-v2";
+const CACHE_NAME = "fry-pos-v3";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -60,6 +60,8 @@ self.addEventListener("fetch", (event) => {
         } catch {
           const cached = await cache.match(request);
           if (cached) return cached;
+          const liveFallback = await cache.match("/live");
+          if (liveFallback) return liveFallback;
           const posFallback = await cache.match("/pos");
           if (posFallback) return posFallback;
           return new Response("Offline — open POS once while online to cache it.", {

@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: `${CAFE_NAME} Counter POS`,
     short_name: `${CAFE_NAME} POS`,
     description: `Counter POS and billing for ${CAFE_NAME} (${CAFE_INSTAGRAM})`,
-    start_url: "/pos",
+    start_url: "/live",
     display: "standalone",
     background_color: "#131211",
     theme_color: "#f73e00",

@@ -363,9 +363,11 @@ export function MenuManager(initial: MenuSnapshot) {
         <div>
           <h1 className="text-3xl font-normal leading-tight">Menu</h1>
           <p className="mt-1 font-mono text-sm text-ink-2">
-            {state.items.length} {state.items.length === 1 ? "item" : "items"},{" "}
-            {state.combos.length} {state.combos.length === 1 ? "combo" : "combos"},{" "}
-            {state.addons.length} {state.addons.length === 1 ? "add-on" : "add-ons"}
+            {state.items.length} {state.items.length === 1 ? "item" : "items"} ·{" "}
+            {state.addons.length} {state.addons.length === 1 ? "dip" : "dips"}
+            {state.combos.length > 0
+              ? ` · ${state.combos.length} ${state.combos.length === 1 ? "combo" : "combos"}`
+              : ""}
           </p>
         </div>
 
@@ -383,17 +385,10 @@ export function MenuManager(initial: MenuSnapshot) {
           </button>
           <button
             type="button"
-            onClick={() => setModal({ kind: "combo", combo: null })}
-            className="btn btn-secondary px-4 text-sm"
-          >
-            New combo
-          </button>
-          <button
-            type="button"
             onClick={() => setModal({ kind: "addon", addon: null })}
             className="btn btn-secondary px-4 text-sm"
           >
-            New add-on
+            New dip / add-on
           </button>
           <button
             type="button"
@@ -409,8 +404,7 @@ export function MenuManager(initial: MenuSnapshot) {
         <section className="rounded-card border border-hairline bg-card p-6 md:p-8">
           <h2 className="text-lg font-medium">No menu items yet</h2>
           <p className="mt-1.5 max-w-xl text-sm text-ink-2">
-            Load the starter FRY menu with signature fries, crispy bites, burgers, coolers,
-            size variations, add-ons, and combos to edit, or start by adding your first category.
+            Load the FRY menu with all 10 fries and 5 dips, or start by adding a category.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
@@ -419,7 +413,7 @@ export function MenuManager(initial: MenuSnapshot) {
               onClick={() => startSeedTransition(() => void seedSampleMenu())}
               className="btn btn-primary px-5 text-sm"
             >
-              {seedPending ? "Loading starter menu" : "Load FRY starter menu"}
+              {seedPending ? "Loading FRY menu" : "Load FRY menu"}
             </button>
             <button
               type="button"
@@ -574,27 +568,23 @@ export function MenuManager(initial: MenuSnapshot) {
         </div>
       )}
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-baseline gap-2.5">
-            <h2 className="text-base font-medium">Combos</h2>
-            <span className="font-mono text-xs text-ink-3">{state.combos.length}</span>
+      {state.combos.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-baseline gap-2.5">
+              <h2 className="text-base font-medium">Combos</h2>
+              <span className="font-mono text-xs text-ink-3">{state.combos.length}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModal({ kind: "combo", combo: null })}
+              className="btn btn-secondary min-h-11 px-3 text-xs sm:min-h-9"
+            >
+              <Plus size={14} strokeWidth={1.5} aria-hidden />
+              New combo
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setModal({ kind: "combo", combo: null })}
-            className="btn btn-secondary min-h-11 px-3 text-xs sm:min-h-9"
-          >
-            <Plus size={14} strokeWidth={1.5} aria-hidden />
-            New combo
-          </button>
-        </div>
 
-        {state.combos.length === 0 ? (
-          <div className="rounded-card border border-hairline bg-card px-4 py-4 text-sm text-ink-3">
-            No combos created yet
-          </div>
-        ) : (
           <ul className="divide-y divide-hairline rounded-card border border-hairline bg-card">
             {state.combos.map((combo) => {
               const members = (comboItemsByCombo.get(combo.id) ?? [])
@@ -660,13 +650,13 @@ export function MenuManager(initial: MenuSnapshot) {
               );
             })}
           </ul>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-baseline gap-2.5">
-            <h2 className="text-base font-medium">Add-ons</h2>
+            <h2 className="text-base font-medium">Dips &amp; add-ons</h2>
             <span className="font-mono text-xs text-ink-3">{state.addons.length}</span>
           </div>
           <button
@@ -675,13 +665,13 @@ export function MenuManager(initial: MenuSnapshot) {
             className="btn btn-secondary min-h-11 px-3 text-xs sm:min-h-9"
           >
             <Plus size={14} strokeWidth={1.5} aria-hidden />
-            New add-on
+            New dip
           </button>
         </div>
 
         {state.addons.length === 0 ? (
           <div className="rounded-card border border-hairline bg-card px-4 py-4 text-sm text-ink-3">
-            No add-ons created yet
+            No dips or add-ons created yet
           </div>
         ) : (
           <ul className="divide-y divide-hairline rounded-card border border-hairline bg-card">

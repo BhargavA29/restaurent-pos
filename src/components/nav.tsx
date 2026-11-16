@@ -13,8 +13,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links: { href: string; label: string; shortLabel: string; icon: LucideIcon }[] = [
-  { href: "/pos", label: "New order", shortLabel: "POS", icon: ReceiptText },
   { href: "/live", label: "Live orders", shortLabel: "Live", icon: ChefHat },
+  { href: "/pos", label: "New order", shortLabel: "POS", icon: ReceiptText },
   { href: "/orders", label: "Orders", shortLabel: "Orders", icon: ClipboardList },
   { href: "/dashboard", label: "Dashboard", shortLabel: "Stats", icon: BarChart3 },
   { href: "/customers", label: "Customers", shortLabel: "Customers", icon: Users },
