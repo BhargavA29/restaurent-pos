@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, ShoppingBag } from "lucide-react";
+import { Droplet, Flame, Search, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/modal";
@@ -22,7 +22,7 @@ import {
 } from "@/lib/offline-outbox";
 import { customerInfoSchema } from "@/lib/validators";
 import { CheckoutModal, KotPrintSlip, type CompletedOrder } from "./checkout-modal";
-import { CustomizeItemModal, type PosItem } from "./customize-modal";
+import { CustomizeItemModal, type PosAddon, type PosItem } from "./customize-modal";
 import { OrderTicket } from "./order-ticket";
 
 export type PosCategory = {
@@ -40,6 +40,7 @@ export type PosCombo = {
 
 export type PopularShortcut = {
   id: string;
+  itemType: "fries" | "dip" | "combo";
   kind: "item" | "combo";
   sourceId: string;
   name: string;
@@ -54,6 +55,7 @@ type PosTerminalProps = {
   categories: PosCategory[];
   items: PosItem[];
   combos: PosCombo[];
+  addons: PosAddon[];
   initialPopular: PopularShortcut[];
   initialCustomers: CustomerRecord[];
 };
@@ -62,6 +64,7 @@ export function PosTerminal({
   categories,
   items,
   combos,
+  addons,
   initialPopular,
   initialCustomers,
 }: PosTerminalProps) {
@@ -106,8 +109,10 @@ export function PosTerminal({
   }, []);
 
   useEffect(() => {
-    void saveCachedMenu({ categories, items, combos, initialPopular }).catch(() => {});
-  }, [categories, items, combos, initialPopular]);
+    void saveCachedMenu({ categories, items, combos, addons, initialPopular }).catch(
+      () => {},
+    );
+  }, [categories, items, combos, addons, initialPopular]);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,6 +181,16 @@ export function PosTerminal({
     });
   }, [activeTab, items, query]);
 
+  const visibleDips = useMemo(() => {
+    if (activeTab !== "all") return [];
+    if (!query) return addons;
+    return addons.filter((a) => a.name.toLowerCase().includes(query));
+  }, [activeTab, addons, query]);
+
+  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const comboById = useMemo(() => new Map(combos.map((c) => [c.id, c])), [combos]);
+  const addonById = useMemo(() => new Map(addons.map((a) => [a.id, a])), [addons]);
+
   function addLine(incoming: Omit<CartLine, "discount" | "complimentary">) {
     setLines((prev) => {
       const idx = prev.findIndex((l) => l.key === incoming.key);
@@ -229,6 +244,19 @@ export function PosTerminal({
       unitPrice: shortcut.price,
       addons: [],
       subtitle: shortcut.subtitle,
+      qty: 1,
+    });
+  }
+
+  function handleDipTap(dip: PosAddon) {
+    addLine({
+      key: buildCartKey("item", dip.id, null, []),
+      kind: "item",
+      sourceId: dip.id,
+      name: dip.name,
+      variantName: "Dip",
+      unitPrice: dip.price,
+      addons: [],
       qty: 1,
     });
   }
@@ -340,23 +368,108 @@ export function PosTerminal({
       }).catch(() => {});
     }
 
-    const qtyAddedByKey = new Map<string, number>();
+    const mainDelta = new Map<string, number>();
+    const dipDelta = new Map<string, number>();
+
     for (const line of completed.items) {
-      const id = `${line.kind}:${line.sourceId}`;
-      qtyAddedByKey.set(id, (qtyAddedByKey.get(id) ?? 0) + line.qty);
+      if (line.variantName === "Dip" || addonById.has(line.sourceId)) {
+        dipDelta.set(line.sourceId, (dipDelta.get(line.sourceId) ?? 0) + line.qty);
+      } else {
+        const id = `${line.kind}:${line.sourceId}`;
+        mainDelta.set(id, (mainDelta.get(id) ?? 0) + line.qty);
+      }
+
+      for (const a of line.addons) {
+        dipDelta.set(a.id, (dipDelta.get(a.id) ?? 0) + line.qty);
+      }
     }
-    if (qtyAddedByKey.size > 0) {
-      setPopular((prev) =>
-        prev.map((s) => {
-          const delta = qtyAddedByKey.get(s.id);
-          return delta ? { ...s, orderCount: s.orderCount + delta } : s;
-        }),
-      );
+
+    if (mainDelta.size > 0 || dipDelta.size > 0) {
+      setPopular((prev) => {
+        const byId = new Map<string, PopularShortcut>(prev.map((s) => [s.id, s]));
+
+        for (const [id, delta] of mainDelta) {
+          const existing = byId.get(id);
+          if (existing) {
+            byId.set(id, { ...existing, orderCount: existing.orderCount + delta });
+            continue;
+          }
+          const [kind, sourceId] = id.split(":") as ["item" | "combo", string];
+          if (kind === "item") {
+            const item = itemById.get(sourceId);
+            if (item && !item.soldOut) {
+              const defVar = item.variants[0] ?? null;
+              byId.set(id, {
+                id,
+                itemType: "fries",
+                kind: "item",
+                sourceId: item.id,
+                name: item.name,
+                variantId: defVar?.id ?? null,
+                variantName: defVar?.name ?? null,
+                price: defVar ? defVar.price : item.price,
+                orderCount: delta,
+              });
+            }
+          } else {
+            const combo = comboById.get(sourceId);
+            if (combo && !combo.soldOut) {
+              byId.set(id, {
+                id,
+                itemType: "combo",
+                kind: "combo",
+                sourceId: combo.id,
+                name: combo.name,
+                variantId: null,
+                variantName: null,
+                price: combo.price,
+                subtitle: combo.membersSummary,
+                orderCount: delta,
+              });
+            }
+          }
+        }
+
+        for (const [addonId, delta] of dipDelta) {
+          const id = `dip:${addonId}`;
+          const existing = byId.get(id);
+          if (existing) {
+            byId.set(id, { ...existing, orderCount: existing.orderCount + delta });
+            continue;
+          }
+          const addon = addonById.get(addonId);
+          if (addon) {
+            byId.set(id, {
+              id,
+              itemType: "dip",
+              kind: "item",
+              sourceId: addon.id,
+              name: addon.name,
+              variantId: null,
+              variantName: "Dip",
+              price: addon.price,
+              orderCount: delta,
+            });
+          }
+        }
+
+        const all = Array.from(byId.values());
+        const topFries = all
+          .filter((s) => s.itemType !== "dip" && s.orderCount > 0)
+          .sort((a, b) => b.orderCount - a.orderCount)
+          .slice(0, 4);
+        const topDips = all
+          .filter((s) => s.itemType === "dip" && s.orderCount > 0)
+          .sort((a, b) => b.orderCount - a.orderCount)
+          .slice(0, 3);
+
+        return [...topFries, ...topDips].sort((a, b) => b.orderCount - a.orderCount);
+      });
     }
   }
 
   const totals = computeCartTotals(lines);
-  const hasMenu = items.length > 0 || combos.length > 0;
+  const hasMenu = items.length > 0 || combos.length > 0 || addons.length > 0;
 
   const sharedTicketProps = {
     lines,
@@ -456,174 +569,311 @@ export function PosTerminal({
                 </div>
               ) : null}
 
-              {activeTab === "all" && !query && popular.length > 0 ? (
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <h2 className="text-sm font-medium text-ink-2">
+              {activeTab === "all" && !query ? (
+                <section
+                  aria-label="Popular orders"
+                  className="rounded-card border border-accent/35 bg-accent-soft/35 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="flex items-center gap-2 text-sm font-medium text-ink">
+                      <Flame
+                        size={15}
+                        strokeWidth={1.75}
+                        className="text-accent-text"
+                        aria-hidden
+                      />
                       Popular — 1-tap add
                     </h2>
+                    <span className="font-mono text-[11px] text-accent-text">
+                      Based on order history
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                    {popular.map((shortcut) => {
-                      const countInCart = qtyBySource.get(shortcut.sourceId) ?? 0;
-                      return (
-                        <button
-                          key={`pop-${shortcut.id}`}
-                          type="button"
-                          onClick={() => handlePopularTap(shortcut)}
-                          className="flex min-h-20 flex-col justify-between gap-1.5 rounded-card border border-hairline bg-card px-3.5 py-3 text-left transition-colors hover:border-ink-3 active:scale-[0.99]"
-                        >
-                          <div className="flex w-full items-start justify-between gap-2">
-                            <span className="text-sm font-medium leading-snug text-ink">
-                              {shortcut.name}
-                              {shortcut.variantName ? (
-                                <span className="font-normal text-ink-3">
-                                  {" "}
-                                  · {shortcut.variantName}
+
+                  {popular.length === 0 ? (
+                    <p className="mt-2.5 text-xs text-ink-2">
+                      Most-ordered fries and dips will appear here automatically once orders are placed.
+                    </p>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                      {popular.map((shortcut) => {
+                        const countInCart = qtyBySource.get(shortcut.sourceId) ?? 0;
+                        const isDip = shortcut.itemType === "dip";
+                        return (
+                          <button
+                            key={`pop-${shortcut.id}`}
+                            type="button"
+                            onClick={() => handlePopularTap(shortcut)}
+                            className={`flex min-h-22 flex-col justify-between gap-2 px-3.5 py-2.5 text-left transition-colors active:scale-[0.99] ${
+                              isDip
+                                ? "rounded-control border border-dashed border-hairline-strong bg-bg hover:border-ink-3"
+                                : "rounded-card border border-hairline border-s-4 border-s-accent bg-card hover:border-ink-3"
+                            }`}
+                          >
+                            <div className="flex w-full items-center justify-between gap-2">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                  isDip
+                                    ? "border border-hairline-strong bg-raised text-ink-2"
+                                    : "bg-accent-soft text-accent-text"
+                                }`}
+                              >
+                                {isDip ? (
+                                  <Droplet size={11} strokeWidth={1.75} aria-hidden />
+                                ) : (
+                                  <Flame size={11} strokeWidth={1.75} aria-hidden />
+                                )}
+                                {shortcut.itemType === "combo"
+                                  ? "Combo"
+                                  : isDip
+                                    ? "Dip"
+                                    : "Fries"}
+                              </span>
+                              <span className="font-mono text-[11px] text-ink-3">
+                                {shortcut.orderCount}× ordered
+                              </span>
+                            </div>
+
+                            <div className="flex w-full items-start justify-between gap-2">
+                              <span className="text-sm font-medium leading-snug text-ink">
+                                {shortcut.name}
+                                {shortcut.variantName && !isDip ? (
+                                  <span className="font-normal text-ink-3">
+                                    {" "}
+                                    · {shortcut.variantName}
+                                  </span>
+                                ) : null}
+                              </span>
+                              {countInCart > 0 ? (
+                                <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
+                                  {countInCart}
                                 </span>
                               ) : null}
-                            </span>
-                            {countInCart > 0 ? (
-                              <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
-                                {countInCart}
-                              </span>
-                            ) : null}
-                          </div>
+                            </div>
 
-                          <div className="flex w-full items-center justify-between gap-2">
-                            <span className="font-mono text-xs font-medium text-ink">
-                              {formatRupees(shortcut.price)}
-                            </span>
-                            <span className="text-xs font-medium text-accent-text">
-                              + Add
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                            <div className="flex w-full items-center justify-between gap-2">
+                              <span className="font-mono text-xs font-medium text-ink">
+                                {formatRupees(shortcut.price)}
+                              </span>
+                              <span className="text-xs font-medium text-accent-text">
+                                + Add
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
               ) : null}
 
-              {visibleCombos.length === 0 && visibleItems.length === 0 ? (
+              {visibleCombos.length === 0 &&
+              visibleItems.length === 0 &&
+              visibleDips.length === 0 ? (
                 <div className="rounded-card border border-hairline bg-card px-4 py-8 text-center text-sm text-ink-3">
                   No menu items match &ldquo;{search}&rdquo;
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {visibleCombos.map((combo) => {
-                    const countInCart = qtyBySource.get(combo.id) ?? 0;
-                    return (
-                      <button
-                        key={`combo-${combo.id}`}
-                        type="button"
-                        disabled={combo.soldOut}
-                        onClick={() => handleComboTap(combo)}
-                        className="flex min-h-28 flex-col justify-between gap-2 rounded-card border border-hairline bg-card p-3.5 text-left transition-colors hover:border-ink-3 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <div className="flex w-full items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <span className="block text-xs font-medium text-accent-text">
-                              Combo
-                            </span>
-                            <span className="mt-0.5 block font-medium leading-snug text-ink">
-                              {combo.name}
-                            </span>
-                          </div>
-                          {countInCart > 0 ? (
-                            <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
-                              {countInCart}
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <div className="flex w-full items-end justify-between gap-2 pt-1">
-                          {combo.soldOut ? (
-                            <span className="text-xs font-medium text-negative">Sold out</span>
-                          ) : (
-                            <span className="font-mono text-sm font-medium text-ink">
-                              {formatRupees(combo.price)}
-                            </span>
-                          )}
-                          <span className="truncate text-xs text-ink-3">
-                            {combo.membersSummary}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-
-                  {visibleItems.map((item) => {
-                    const countInCart = qtyBySource.get(item.id) ?? 0;
-                    const prices =
-                      item.variants.length > 0
-                        ? item.variants.map((v) => v.price)
-                        : [item.price];
-                    const minPrice = Math.min(...prices);
-                    const hasMultiplePrices = new Set(prices).size > 1;
-                    const hasVariants = item.variants.length > 0;
-                    const hasDips = item.addons.length > 0;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`flex min-h-28 flex-col justify-between gap-2 rounded-card border border-hairline bg-card p-3.5 transition-colors hover:border-ink-3 ${
-                          item.soldOut ? "opacity-50" : ""
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          disabled={item.soldOut}
-                          onClick={() => handleItemTap(item)}
-                          className="flex flex-1 flex-col justify-between gap-2 text-left active:scale-[0.99] disabled:cursor-not-allowed"
-                        >
-                          <div className="flex w-full items-start justify-between gap-2">
-                            <span className="font-medium leading-snug text-ink">
-                              {item.name}
-                            </span>
-                            {countInCart > 0 ? (
-                              <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
-                                {countInCart}
-                              </span>
-                            ) : null}
-                          </div>
-                        </button>
-
-                        <div className="flex w-full items-center justify-between gap-2 pt-1">
-                          <button
-                            type="button"
-                            disabled={item.soldOut}
-                            onClick={() => handleItemTap(item)}
-                            className="text-left disabled:cursor-not-allowed"
-                          >
-                            {item.soldOut ? (
-                              <span className="text-xs font-medium text-negative">Sold out</span>
-                            ) : (
-                              <span className="font-mono text-sm font-medium text-ink">
-                                {formatRupees(minPrice)}
-                                {hasMultiplePrices ? "+" : ""}
-                              </span>
-                            )}
-                          </button>
-
-                          {!item.soldOut && hasVariants ? (
-                            <span className="text-xs text-ink-3">
-                              {item.variants.length} sizes
-                            </span>
-                          ) : !item.soldOut && hasDips ? (
-                            <button
-                              type="button"
-                              aria-label={`Add dips for ${item.name}`}
-                              onClick={() => setCustomizing(item)}
-                              className="inline-flex min-h-8 items-center rounded-control border border-hairline-strong bg-bg px-2.5 text-xs font-medium text-accent-text transition-colors hover:border-accent"
-                            >
-                              + Dips
-                            </button>
-                          ) : null}
-                        </div>
+                <div
+                  className={`flex flex-col gap-6 ${
+                    activeTab === "all" && !query ? "border-t border-hairline pt-4" : ""
+                  }`}
+                >
+                  {visibleCombos.length > 0 || visibleItems.length > 0 ? (
+                    <section aria-label="Fries menu" className="flex flex-col gap-3">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <h2 className="flex items-center gap-2 text-sm font-medium text-ink-2">
+                          <Flame
+                            size={15}
+                            strokeWidth={1.75}
+                            className="text-accent-text"
+                            aria-hidden
+                          />
+                          Menu — Fries
+                        </h2>
+                        <span className="font-mono text-xs text-ink-3">
+                          {visibleCombos.length + visibleItems.length}
+                        </span>
                       </div>
-                    );
-                  })}
+
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {visibleCombos.map((combo) => {
+                          const countInCart = qtyBySource.get(combo.id) ?? 0;
+                          return (
+                            <button
+                              key={`combo-${combo.id}`}
+                              type="button"
+                              disabled={combo.soldOut}
+                              onClick={() => handleComboTap(combo)}
+                              className="flex min-h-28 flex-col justify-between gap-2 rounded-card border border-hairline bg-card p-3.5 text-left transition-colors hover:border-ink-3 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <div className="flex w-full items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <span className="block text-xs font-medium text-accent-text">
+                                    Combo
+                                  </span>
+                                  <span className="mt-0.5 block font-medium leading-snug text-ink">
+                                    {combo.name}
+                                  </span>
+                                </div>
+                                {countInCart > 0 ? (
+                                  <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
+                                    {countInCart}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <div className="flex w-full items-end justify-between gap-2 pt-1">
+                                {combo.soldOut ? (
+                                  <span className="text-xs font-medium text-negative">
+                                    Sold out
+                                  </span>
+                                ) : (
+                                  <span className="font-mono text-sm font-medium text-ink">
+                                    {formatRupees(combo.price)}
+                                  </span>
+                                )}
+                                <span className="truncate text-xs text-ink-3">
+                                  {combo.membersSummary}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+
+                        {visibleItems.map((item) => {
+                          const countInCart = qtyBySource.get(item.id) ?? 0;
+                          const prices =
+                            item.variants.length > 0
+                              ? item.variants.map((v) => v.price)
+                              : [item.price];
+                          const minPrice = Math.min(...prices);
+                          const hasMultiplePrices = new Set(prices).size > 1;
+                          const hasVariants = item.variants.length > 0;
+                          const hasDips = item.addons.length > 0;
+
+                          return (
+                            <div
+                              key={item.id}
+                              className={`flex min-h-28 flex-col justify-between gap-2 rounded-card border border-hairline bg-card p-3.5 transition-colors hover:border-ink-3 ${
+                                item.soldOut ? "opacity-50" : ""
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                disabled={item.soldOut}
+                                onClick={() => handleItemTap(item)}
+                                className="flex flex-1 flex-col gap-2 text-left active:scale-[0.99] disabled:cursor-not-allowed"
+                              >
+                                <div className="flex w-full items-center justify-between gap-2">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-text">
+                                    <Flame size={11} strokeWidth={1.75} aria-hidden />
+                                    Fries
+                                  </span>
+                                  {countInCart > 0 ? (
+                                    <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
+                                      {countInCart}
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                <span className="font-medium leading-snug text-ink">
+                                  {item.name}
+                                </span>
+                              </button>
+
+                              <div className="flex w-full items-center justify-between gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  disabled={item.soldOut}
+                                  onClick={() => handleItemTap(item)}
+                                  className="text-left disabled:cursor-not-allowed"
+                                >
+                                  {item.soldOut ? (
+                                    <span className="text-xs font-medium text-negative">
+                                      Sold out
+                                    </span>
+                                  ) : (
+                                    <span className="font-mono text-sm font-medium text-ink">
+                                      {formatRupees(minPrice)}
+                                      {hasMultiplePrices ? "+" : ""}
+                                    </span>
+                                  )}
+                                </button>
+
+                                {!item.soldOut && hasVariants ? (
+                                  <span className="text-xs text-ink-3">
+                                    {item.variants.length} sizes
+                                  </span>
+                                ) : !item.soldOut && hasDips ? (
+                                  <button
+                                    type="button"
+                                    aria-label={`Add dips for ${item.name}`}
+                                    onClick={() => setCustomizing(item)}
+                                    className="inline-flex min-h-8 items-center rounded-control border border-hairline-strong bg-bg px-2.5 text-xs font-medium text-accent-text transition-colors hover:border-accent"
+                                  >
+                                    + Dips
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {visibleDips.length > 0 ? (
+                    <section aria-label="Dips menu" className="flex flex-col gap-3">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h2 className="flex items-center gap-2 text-sm font-medium text-ink-2">
+                          <Droplet size={15} strokeWidth={1.75} aria-hidden />
+                          Dips — 1-tap add
+                        </h2>
+                        <span className="font-mono text-xs text-ink-3">
+                          {visibleDips.length}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                        {visibleDips.map((dip) => {
+                          const countInCart = qtyBySource.get(dip.id) ?? 0;
+                          return (
+                            <button
+                              key={`dip-${dip.id}`}
+                              type="button"
+                              onClick={() => handleDipTap(dip)}
+                              className="flex min-h-20 flex-col justify-between gap-2 rounded-control border border-dashed border-hairline-strong bg-raised/45 px-3.5 py-2.5 text-left transition-colors hover:border-ink-3 active:scale-[0.99]"
+                            >
+                              <div className="flex w-full items-center justify-between gap-2">
+                                <span className="inline-flex items-center gap-1 rounded-full border border-hairline-strong bg-card px-2 py-0.5 text-[11px] font-medium text-ink-2">
+                                  <Droplet size={11} strokeWidth={1.75} aria-hidden />
+                                  Dip
+                                </span>
+                                {countInCart > 0 ? (
+                                  <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
+                                    {countInCart}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <span className="text-sm font-medium leading-snug text-ink">
+                                {dip.name}
+                              </span>
+
+                              <div className="flex w-full items-center justify-between gap-2">
+                                <span className="font-mono text-xs font-medium text-ink">
+                                  {formatRupees(dip.price)}
+                                </span>
+                                <span className="text-xs font-medium text-ink-2">
+                                  + Add dip
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ) : null}
                 </div>
               )}
             </>

@@ -22,6 +22,7 @@ function itemToShortcut(item: PosItem, orderCount: number): PopularShortcut {
   const defaultVariant = item.variants[0] ?? null;
   return {
     id: `item:${item.id}`,
+    itemType: "fries",
     kind: "item",
     sourceId: item.id,
     name: item.name,
@@ -32,9 +33,24 @@ function itemToShortcut(item: PosItem, orderCount: number): PopularShortcut {
   };
 }
 
+function addonToShortcut(addon: PosAddon, orderCount: number): PopularShortcut {
+  return {
+    id: `dip:${addon.id}`,
+    itemType: "dip",
+    kind: "item",
+    sourceId: addon.id,
+    name: addon.name,
+    variantId: null,
+    variantName: "Dip",
+    price: addon.price,
+    orderCount,
+  };
+}
+
 function comboToShortcut(combo: PosCombo, orderCount: number): PopularShortcut {
   return {
     id: `combo:${combo.id}`,
+    itemType: "combo",
     kind: "combo",
     sourceId: combo.id,
     name: combo.name,
@@ -59,6 +75,7 @@ export default async function PosPage() {
     comboRows,
     comboItemRows,
     topOrderedRows,
+    topAddonResult,
     customerRows,
   ] = await Promise.all([
     db
@@ -84,12 +101,20 @@ export default async function PosPage() {
       .select({
         kind: orderItems.kind,
         name: orderItems.name,
+        variantName: orderItems.variantName,
         totalQty: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int`,
       })
       .from(orderItems)
-      .groupBy(orderItems.kind, orderItems.name)
+      .groupBy(orderItems.kind, orderItems.name, orderItems.variantName)
       .orderBy(sql`sum(${orderItems.qty}) desc`)
-      .limit(10),
+      .limit(20),
+    db.execute<{ name: string; totalQty: number }>(
+      sql`select elem->>'name' as name, coalesce(sum(${orderItems.qty}), 0)::int as "totalQty"
+          from ${orderItems}, jsonb_array_elements(${orderItems.addons}) as elem
+          group by elem->>'name'
+          order by sum(${orderItems.qty}) desc
+          limit 10`,
+    ),
     db
       .select({
         phone: customers.phone,
@@ -104,6 +129,7 @@ export default async function PosPage() {
 
   const activeCategoryIds = new Set(categoryRows.map((c) => c.id));
   const addonById = new Map<string, PosAddon>(addonRows.map((a) => [a.id, a]));
+  const addonByName = new Map<string, PosAddon>(addonRows.map((a) => [a.name, a]));
   const itemNameById = new Map(itemRows.map((i) => [i.id, i.name]));
 
   const variantsByItem = new Map<string, PosVariant[]>();
@@ -158,44 +184,75 @@ export default async function PosPage() {
     posCombos.filter((c) => !c.soldOut).map((c) => [c.name, c]),
   );
 
-  const popular: PopularShortcut[] = [];
-  const seen = new Set<string>();
+  // Aggregate popular items and dips strictly from order history (no un-ordered fallback items).
+  const itemCounts = new Map<string, number>();
+  const comboCounts = new Map<string, number>();
+  const dipCounts = new Map<string, number>();
 
-  for (const top of topOrderedRows) {
-    if (popular.length >= 6) break;
-    if (top.kind === "combo") {
-      const combo = availableCombosByName.get(top.name);
-      if (combo && !seen.has(`combo:${combo.id}`)) {
-        seen.add(`combo:${combo.id}`);
-        popular.push(comboToShortcut(combo, top.totalQty));
-      }
-    } else {
-      const item = availableItemsByName.get(top.name);
-      if (item && !seen.has(`item:${item.id}`)) {
-        seen.add(`item:${item.id}`);
-        popular.push(itemToShortcut(item, top.totalQty));
-      }
+  for (const row of topAddonResult.rows) {
+    if (row.name && row.totalQty > 0) {
+      dipCounts.set(row.name, (dipCounts.get(row.name) ?? 0) + Number(row.totalQty));
     }
   }
 
-  const fallbackPool: PopularShortcut[] = [
-    ...posCombos.filter((c) => !c.soldOut).slice(0, 2).map((c) => comboToShortcut(c, 0)),
-    ...posItems.filter((i) => !i.soldOut).map((i) => itemToShortcut(i, 0)),
-  ];
+  for (const row of topOrderedRows) {
+    if (row.totalQty <= 0) continue;
+    if (row.kind === "combo") {
+      if (availableCombosByName.has(row.name)) {
+        comboCounts.set(row.name, (comboCounts.get(row.name) ?? 0) + row.totalQty);
+      }
+      continue;
+    }
 
-  for (const shortcut of fallbackPool) {
-    if (popular.length >= 6) break;
-    if (!seen.has(shortcut.id)) {
-      seen.add(shortcut.id);
-      popular.push(shortcut);
+    const isDipOrder =
+      row.variantName === "Dip" ||
+      (addonByName.has(row.name) && !availableItemsByName.has(row.name));
+
+    if (isDipOrder) {
+      if (addonByName.has(row.name)) {
+        dipCounts.set(row.name, (dipCounts.get(row.name) ?? 0) + row.totalQty);
+      }
+    } else if (availableItemsByName.has(row.name)) {
+      itemCounts.set(row.name, (itemCounts.get(row.name) ?? 0) + row.totalQty);
     }
   }
+
+  const popularFries: PopularShortcut[] = [
+    ...Array.from(itemCounts.entries())
+      .map(([name, qty]) => {
+        const item = availableItemsByName.get(name);
+        return item ? itemToShortcut(item, qty) : null;
+      })
+      .filter((s): s is PopularShortcut => s !== null),
+    ...Array.from(comboCounts.entries())
+      .map(([name, qty]) => {
+        const combo = availableCombosByName.get(name);
+        return combo ? comboToShortcut(combo, qty) : null;
+      })
+      .filter((s): s is PopularShortcut => s !== null),
+  ]
+    .sort((a, b) => b.orderCount - a.orderCount)
+    .slice(0, 4);
+
+  const popularDips: PopularShortcut[] = Array.from(dipCounts.entries())
+    .map(([name, qty]) => {
+      const addon = addonByName.get(name);
+      return addon && qty > 0 ? addonToShortcut(addon, qty) : null;
+    })
+    .filter((s): s is PopularShortcut => s !== null)
+    .sort((a, b) => b.orderCount - a.orderCount)
+    .slice(0, 3);
+
+  const popular: PopularShortcut[] = [...popularFries, ...popularDips].sort(
+    (a, b) => b.orderCount - a.orderCount,
+  );
 
   return (
     <PosTerminal
       categories={categoryRows}
       items={posItems}
       combos={posCombos}
+      addons={addonRows}
       initialPopular={popular}
       initialCustomers={customerRows}
     />
