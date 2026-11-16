@@ -9,6 +9,7 @@ import {
   type OrderType,
 } from "@/lib/cart";
 import { formatRupees } from "@/lib/format";
+import { normalizePhoneInput } from "@/lib/validators";
 
 type OrderTicketProps = {
   lines: CartLine[];
@@ -125,16 +126,12 @@ export function OrderTicket({
             id={phoneId}
             type="tel"
             inputMode="numeric"
-            maxLength={14}
+            maxLength={10}
             autoComplete="off"
             aria-invalid={customerError ? "true" : "false"}
             value={customerPhone}
             onChange={(e) => {
-              const digits = e.target.value
-                .replace(/^\+?91[\s-]?/, "")
-                .replace(/\D/g, "")
-                .slice(0, 10);
-              onCustomerPhoneChange(digits);
+              onCustomerPhoneChange(normalizePhoneInput(e.target.value).slice(0, 10));
             }}
             placeholder="10-digit number"
             className="field font-mono text-sm"

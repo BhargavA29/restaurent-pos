@@ -9,8 +9,8 @@ export const moneySchema = z
   .max(100_000, "Amount cannot exceed ₹1,00,000");
 
 export function normalizePhoneInput(raw: string): string {
-  const trimmed = raw.trim().replace(/[\s-]/g, "");
-  return trimmed.startsWith("+91") ? trimmed.slice(3) : trimmed;
+  const digits = raw.replace(/\D/g, "");
+  return digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
 }
 
 export const optionalPhoneSchema = z
