@@ -1,6 +1,7 @@
 import { Flame, LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { Nav } from "@/components/nav";
+import { OfflineSyncBar } from "@/components/offline-sync-bar";
 import { requireOwner } from "@/lib/auth";
 import { CAFE_INSTAGRAM, CAFE_NAME } from "@/lib/brand";
 
@@ -61,6 +62,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </header>
 
         <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-6 md:px-8 md:pb-10 md:pt-8">
+          <OfflineSyncBar />
           {children}
         </main>
       </div>

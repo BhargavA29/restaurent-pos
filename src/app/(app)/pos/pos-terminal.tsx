@@ -12,6 +12,7 @@ import {
   type OrderType,
 } from "@/lib/cart";
 import { formatRupees } from "@/lib/format";
+import { saveCachedMenu } from "@/lib/offline-outbox";
 import { customerInfoSchema } from "@/lib/validators";
 import { CheckoutModal, KotPrintSlip, type CompletedOrder } from "./checkout-modal";
 import { CustomizeItemModal, type PosItem } from "./customize-modal";
@@ -92,6 +93,10 @@ export function PosTerminal({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    void saveCachedMenu({ categories, items, combos, initialPopular }).catch(() => {});
+  }, [categories, items, combos, initialPopular]);
 
   const qtyBySource = useMemo(() => {
     const map = new Map<string, number>();

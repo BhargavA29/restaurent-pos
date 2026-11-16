@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: { default: CAFE_NAME, template: `%s · ${CAFE_NAME}` },
   description: `Counter POS and billing for ${CAFE_NAME} (${CAFE_INSTAGRAM})`,
+  appleWebApp: {
+    capable: true,
+    title: `${CAFE_NAME} POS`,
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {

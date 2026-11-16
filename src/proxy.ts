@@ -7,7 +7,11 @@ export async function proxy(request: NextRequest) {
   const session = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/bill/")) {
+  if (
+    pathname.startsWith("/bill/") ||
+    pathname === "/icon" ||
+    pathname === "/apple-icon"
+  ) {
     return NextResponse.next();
   }
   if (pathname === "/login") {

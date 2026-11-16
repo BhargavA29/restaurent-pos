@@ -16,10 +16,12 @@ import {
   formatRupees,
   ORDER_TYPE_LABEL,
 } from "@/lib/format";
+import { enqueueOfflineOrder } from "@/lib/offline-outbox";
 import {
   normalizePhoneInput,
   optionalPhoneSchema,
   parseRupeesInput,
+  type CreateOrderInput,
   type PaymentMode,
 } from "@/lib/validators";
 import { placeOrder } from "./actions";
@@ -28,6 +30,7 @@ export type CompletedOrder = {
   orderId: string;
   sig: string;
   billNo: number;
+  queuedOffline?: boolean;
   type: OrderType;
   customerName: string;
   customerPhone: string;
@@ -45,10 +48,11 @@ const MODES: { id: PaymentMode; label: string }[] = [
   { id: "card", label: "Card" },
 ];
 
-function buildWhatsAppBillText(order: CompletedOrder, billUrl: string): string {
+function buildWhatsAppBillText(order: CompletedOrder, billUrl: string | null): string {
+  const billLabel = order.queuedOffline ? `#OFF-${order.billNo}` : `#${order.billNo}`;
   const lines: string[] = [
     `*${CAFE_NAME}* (${CAFE_INSTAGRAM})`,
-    `Bill #${order.billNo} · ${ORDER_TYPE_LABEL[order.type]}`,
+    `Bill ${billLabel} · ${ORDER_TYPE_LABEL[order.type]}`,
     formatIstDateTime(order.placedAtIso),
   ];
 
@@ -81,9 +85,11 @@ function buildWhatsAppBillText(order: CompletedOrder, billUrl: string): string {
   }
   lines.push(`*Total: ${formatRupees(order.total)}*`);
   lines.push(`Paid via ${formatPaymentsSummary(order.payments)}`);
-  lines.push("");
-  lines.push("Digital bill & download (valid 48h):");
-  lines.push(billUrl);
+  if (billUrl) {
+    lines.push("");
+    lines.push("Digital bill & download (valid 48h):");
+    lines.push(billUrl);
+  }
   lines.push("");
   lines.push(CAFE_TAGLINE);
 
@@ -190,39 +196,80 @@ function PaymentStage({
       };
     });
 
-    startTransition(async () => {
-      const result = await placeOrder({
-        id: orderId,
-        type: orderType,
-        customerName,
-        customerPhone,
-        subtotal,
-        discountTotal,
-        total,
-        placedAt: placedAtIso,
-        items: orderItemsPayload,
-        payments: paymentRows,
-      });
+    const payload: CreateOrderInput = {
+      id: orderId,
+      type: orderType,
+      customerName,
+      customerPhone,
+      subtotal,
+      discountTotal,
+      total,
+      placedAt: placedAtIso,
+      items: orderItemsPayload,
+      payments: paymentRows,
+    };
 
-      if ("error" in result) {
-        setError(result.error);
+    async function queueOfflineFallback() {
+      try {
+        const queued = await enqueueOfflineOrder(payload);
+        onOrderPlaced({
+          orderId: payload.id,
+          sig: "",
+          billNo: queued.localSeq,
+          queuedOffline: true,
+          type: orderType,
+          customerName,
+          customerPhone,
+          subtotal,
+          discountTotal,
+          total,
+          placedAtIso,
+          items: lines,
+          payments: paymentRows,
+        });
+      } catch {
+        setError("You appear offline and local storage is unavailable.");
+      }
+    }
+
+    startTransition(async () => {
+      if (!navigator.onLine) {
+        await queueOfflineFallback();
         return;
       }
 
-      onOrderPlaced({
-        orderId: result.orderId,
-        sig: result.sig,
-        billNo: result.billNo,
-        type: orderType,
-        customerName,
-        customerPhone,
-        subtotal,
-        discountTotal,
-        total,
-        placedAtIso,
-        items: lines,
-        payments: paymentRows,
-      });
+      try {
+        const result = await placeOrder(payload);
+
+        if ("error" in result) {
+          if (
+            !navigator.onLine ||
+            result.error.startsWith("Could not save order")
+          ) {
+            await queueOfflineFallback();
+            return;
+          }
+          setError(result.error);
+          return;
+        }
+
+        onOrderPlaced({
+          orderId: result.orderId,
+          sig: result.sig,
+          billNo: result.billNo,
+          type: orderType,
+          customerName,
+          customerPhone,
+          subtotal,
+          discountTotal,
+          total,
+          placedAtIso,
+          items: lines,
+          payments: paymentRows,
+        });
+      } catch {
+        await queueOfflineFallback();
+      }
     });
   }
 
@@ -360,6 +407,7 @@ function ReceiptStage({
   const [waPhone, setWaPhone] = useState(order.customerPhone);
   const [waError, setWaError] = useState<string | null>(null);
 
+  const billLabel = order.queuedOffline ? `#OFF-${order.billNo}` : `#${order.billNo}`;
   const sigParam = encodeURIComponent(order.sig);
   const billPath = `/bill/${order.orderId}?s=${sigParam}`;
   const downloadPath = `/api/bill-image/${order.orderId}?s=${sigParam}&download=1`;
@@ -371,7 +419,7 @@ function ReceiptStage({
       return;
     }
     setWaError(null);
-    const billUrl = `${window.location.origin}${billPath}`;
+    const billUrl = order.queuedOffline ? null : `${window.location.origin}${billPath}`;
     const text = buildWhatsAppBillText(order, billUrl);
     const target = parsed.data
       ? `https://wa.me/91${parsed.data}?text=${encodeURIComponent(text)}`
@@ -381,16 +429,22 @@ function ReceiptStage({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <span className="block text-xs text-ink-3">Bill number</span>
           <span className="font-mono text-3xl font-medium tracking-tight text-ink">
-            #{order.billNo}
+            {billLabel}
           </span>
         </div>
-        <span className="rounded-full bg-positive/15 px-3 py-1 text-xs font-medium text-positive">
-          Paid · {formatPaymentsSummary(order.payments)}
-        </span>
+        {order.queuedOffline ? (
+          <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent-text">
+            Queued offline · {billLabel} (will sync automatically when online)
+          </span>
+        ) : (
+          <span className="rounded-full bg-positive/15 px-3 py-1 text-xs font-medium text-positive">
+            Paid · {formatPaymentsSummary(order.payments)}
+          </span>
+        )}
       </div>
 
       <div className="rounded-control border border-hairline bg-bg p-4 font-mono text-xs leading-relaxed text-ink">
@@ -400,7 +454,7 @@ function ReceiptStage({
         </div>
         <div className="mt-1 flex flex-wrap justify-between gap-2 text-ink-2">
           <span>
-            Bill #{order.billNo} · {ORDER_TYPE_LABEL[order.type]}
+            Bill {billLabel} · {ORDER_TYPE_LABEL[order.type]}
           </span>
           <span>{formatIstDateTime(order.placedAtIso)}</span>
         </div>
@@ -491,21 +545,23 @@ function ReceiptStage({
           Send bill on WhatsApp
         </button>
 
-        <div className="grid grid-cols-2 gap-2">
-          <a href={downloadPath} download className="btn btn-secondary text-xs sm:text-sm">
-            <Download size={16} strokeWidth={1.5} aria-hidden />
-            Download PNG bill
-          </a>
-          <a
-            href={billPath}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-secondary text-xs sm:text-sm"
-          >
-            <ExternalLink size={16} strokeWidth={1.5} aria-hidden />
-            Open 48h bill link
-          </a>
-        </div>
+        {!order.queuedOffline ? (
+          <div className="grid grid-cols-2 gap-2">
+            <a href={downloadPath} download className="btn btn-secondary text-xs sm:text-sm">
+              <Download size={16} strokeWidth={1.5} aria-hidden />
+              Download PNG bill
+            </a>
+            <a
+              href={billPath}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary text-xs sm:text-sm"
+            >
+              <ExternalLink size={16} strokeWidth={1.5} aria-hidden />
+              Open 48h bill link
+            </a>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-2 border-t border-hairline pt-4">
@@ -574,7 +630,9 @@ export function KotPrintSlip({ order }: { order: CompletedOrder | null }) {
     <div id="kot-print-slip" className="hidden font-mono text-xs text-black print:block">
       <div className="border-b border-dashed border-black pb-2">
         <p className="text-sm font-bold">{CAFE_NAME} — KOT</p>
-        <p className="mt-1 text-lg font-bold">BILL #{order.billNo}</p>
+        <p className="mt-1 text-lg font-bold">
+          BILL {order.queuedOffline ? `#OFF-${order.billNo}` : `#${order.billNo}`}
+        </p>
         <p className="mt-0.5 font-bold uppercase">
           {order.type === "takeaway" ? "TAKEAWAY" : "SELF-PICKUP"}
         </p>
