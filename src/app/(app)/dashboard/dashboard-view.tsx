@@ -9,11 +9,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useState, useTransition } from "react";
 import { type OrderType } from "@/lib/cart";
 import { formatIstDateTime, formatRupees, ORDER_TYPE_LABEL } from "@/lib/format";
 import { expenseSchema, parseRupeesInput, type PaymentMode } from "@/lib/validators";
 import { deleteExpense, saveExpense } from "./actions";
+import { DashboardBodySkeleton } from "./dashboard-skeleton";
 
 export type DayRevenuePoint = {
   date: string;
@@ -101,6 +102,8 @@ export function DashboardView({
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [expenseError, setExpenseError] = useState<string | null>(null);
+  const [pendingDate, setPendingDate] = useState<string | null>(null);
+  const [isDatePending, startDateTransition] = useTransition();
 
   const todayPoint = sevenDays[sevenDays.length - 1];
   const yesterdayPoint = sevenDays[sevenDays.length - 2];
@@ -144,8 +147,11 @@ export function DashboardView({
   }, [hourlyBreakdown]);
 
   function goToDate(date: string) {
-    if (!date) return;
-    router.push(date === todayDate ? "/dashboard" : `/dashboard?date=${date}`);
+    if (!date || date === selectedDate) return;
+    setPendingDate(date);
+    startDateTransition(() => {
+      router.push(date === todayDate ? "/dashboard" : `/dashboard?date=${date}`);
+    });
   }
 
   function handleExportCsv() {
@@ -293,7 +299,7 @@ export function DashboardView({
           <input
             id={dateInputId}
             type="date"
-            value={selectedDate}
+            value={isDatePending && pendingDate ? pendingDate : selectedDate}
             max={todayDate}
             onChange={(e) => goToDate(e.target.value)}
             className="field w-auto font-mono text-sm"
@@ -330,10 +336,14 @@ export function DashboardView({
         </div>
       </header>
 
-      <section
-        aria-label="Day summary"
-        className="grid grid-cols-1 gap-4 sm:grid-cols-3"
-      >
+      {isDatePending ? (
+        <DashboardBodySkeleton />
+      ) : (
+        <>
+          <section
+            aria-label="Day summary"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+          >
         <div className="rounded-card border border-hairline bg-card p-5">
           <p className="text-sm text-ink-2">Total revenue</p>
           <p className="mt-2 font-mono text-3xl font-medium leading-none text-ink">
@@ -760,6 +770,8 @@ export function DashboardView({
           )}
         </div>
       </section>
+        </>
+      )}
     </div>
   );
 }

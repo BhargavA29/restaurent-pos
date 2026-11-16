@@ -72,6 +72,40 @@
     --negative: var(--negative-dark);
   }
 
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+    --bg: var(--bg-dark);
+    --sidebar: var(--sidebar-dark);
+    --card: var(--card-dark);
+    --raised: var(--raised-dark);
+    --hairline: var(--hairline-dark);
+    --hairline-strong: var(--hairline-strong-dark);
+    --text: var(--text-dark);
+    --text-2: var(--text-2-dark);
+    --text-3: var(--text-3-dark);
+    --accent-text: var(--accent-text-dark);
+    --accent-soft: var(--accent-soft-dark);
+    --positive: var(--positive-dark);
+    --negative: var(--negative-dark);
+  }
+
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+    --bg: var(--bg-light);
+    --sidebar: var(--sidebar-light);
+    --card: var(--card-light);
+    --raised: var(--raised-light);
+    --hairline: var(--hairline-light);
+    --hairline-strong: var(--hairline-strong-light);
+    --text: var(--text-light);
+    --text-2: var(--text-2-light);
+    --text-3: var(--text-3-light);
+    --accent-text: var(--accent-text-light);
+    --accent-soft: var(--accent-soft-light);
+    --positive: var(--positive-light);
+    --negative: var(--negative-light);
+  }
+
   @supports (color: light-dark(white, black)) {
     --bg: light-dark(var(--bg-light), var(--bg-dark));
     --sidebar: light-dark(var(--sidebar-light), var(--sidebar-dark));
@@ -204,6 +238,45 @@ body {
   .btn-danger:hover:not(:disabled) {
     border-color: var(--negative);
   }
+
+  .skeleton {
+    background: var(--raised);
+    border-radius: 6px;
+    animation: pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+.theme-only-dark {
+  display: none;
+}
+
+.theme-only-light {
+  display: inline-flex;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(:has(> head > meta[name="color-scheme"][content="light"])) .theme-only-dark {
+    display: inline-flex;
+  }
+  :root:not(:has(> head > meta[name="color-scheme"][content="light"])) .theme-only-light {
+    display: none;
+  }
+}
+
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .theme-only-dark {
+  display: inline-flex;
+}
+
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .theme-only-light {
+  display: none;
+}
+
+:root:has(> head > meta[name="color-scheme"][content="light"]) .theme-only-dark {
+  display: none;
+}
+
+:root:has(> head > meta[name="color-scheme"][content="light"]) .theme-only-light {
+  display: inline-flex;
 }
 
 /* Native <dialog> modal: never set display on bare dialog, only dialog[open]. */

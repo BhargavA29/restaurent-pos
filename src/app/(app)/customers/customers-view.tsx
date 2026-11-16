@@ -10,7 +10,8 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useId, useRef, useState, useTransition } from "react";
 import { formatIstDateTime, formatRupees } from "@/lib/format";
 import {
   loadLocalCustomers,
@@ -18,6 +19,7 @@ import {
   type CustomerRecord,
 } from "@/lib/offline-outbox";
 import { updateCustomerName } from "./actions";
+import { CustomersTableRowsSkeleton } from "./customers-skeleton";
 
 export type CustomerSort = "recent" | "spent" | "orders";
 
@@ -90,9 +92,12 @@ export function CustomersView({
   query,
   sort,
 }: CustomersViewProps) {
+  const router = useRouter();
   const searchId = useId();
   const captionId = useId();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const [isPending, startTransition] = useTransition();
   const [rows, setRows] = useState<CustomerRow[]>(initialCustomers);
   const [editingPhone, setEditingPhone] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
@@ -102,6 +107,36 @@ export function CustomersView({
   const startIdx = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endIdx = Math.min(currentPage * pageSize, totalCount);
   const visiblePages = getVisiblePages(currentPage, totalPages);
+
+  function navigate(href: string) {
+    startTransition(() => {
+      router.push(href);
+    });
+  }
+
+  function handleLinkNavigation(
+    event: React.MouseEvent<HTMLAnchorElement>,
+    href: string,
+  ) {
+    if (
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      event.button !== 0
+    ) {
+      return;
+    }
+    event.preventDefault();
+    navigate(href);
+  }
+
+  function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const raw = searchInputRef.current?.value ?? "";
+    const nextQuery = raw.trim().slice(0, 80);
+    navigate(buildCustomersHref({ query: nextQuery, sort }));
+  }
 
   function startEdit(row: CustomerRow) {
     setEditError(null);
@@ -196,9 +231,13 @@ export function CustomersView({
       >
         <div className="rounded-card border border-hairline bg-card p-5">
           <p className="text-sm text-ink-2">Total customers</p>
-          <p className="mt-2 font-mono text-3xl font-medium leading-none text-ink">
-            {totalCount}
-          </p>
+          {isPending ? (
+            <div className="skeleton mt-2 h-8 w-20" />
+          ) : (
+            <p className="mt-2 font-mono text-3xl font-medium leading-none text-ink">
+              {totalCount}
+            </p>
+          )}
           <p className="mt-2.5 text-xs text-ink-3">
             {query ? `Matching "${query}"` : "Saved with WhatsApp numbers"}
           </p>
@@ -206,17 +245,25 @@ export function CustomersView({
 
         <div className="rounded-card border border-hairline bg-card p-5">
           <p className="text-sm text-ink-2">Repeat customers</p>
-          <p className="mt-2 font-mono text-3xl font-medium leading-none text-ink">
-            {repeatCount}
-          </p>
+          {isPending ? (
+            <div className="skeleton mt-2 h-8 w-20" />
+          ) : (
+            <p className="mt-2 font-mono text-3xl font-medium leading-none text-ink">
+              {repeatCount}
+            </p>
+          )}
           <p className="mt-2.5 text-xs text-ink-3">Customers with 2 or more orders</p>
         </div>
 
         <div className="rounded-card border border-hairline bg-card p-5">
           <p className="text-sm text-ink-2">Total customer spend</p>
-          <p className="mt-2 font-mono text-3xl font-medium leading-none text-ink">
-            {formatRupees(totalRevenue)}
-          </p>
+          {isPending ? (
+            <div className="skeleton mt-2 h-8 w-28" />
+          ) : (
+            <p className="mt-2 font-mono text-3xl font-medium leading-none text-ink">
+              {formatRupees(totalRevenue)}
+            </p>
+          )}
           <p className="mt-2.5 text-xs text-ink-3">Combined bill value</p>
         </div>
       </section>
@@ -226,6 +273,7 @@ export function CustomersView({
           <form
             method="get"
             action="/customers"
+            onSubmit={handleSearchSubmit}
             className="flex flex-1 flex-wrap items-center gap-2"
           >
             <div className="relative min-w-0 flex-1 sm:max-w-sm">
@@ -239,6 +287,7 @@ export function CustomersView({
                 className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3"
               />
               <input
+                ref={searchInputRef}
                 id={searchId}
                 name="q"
                 type="search"
@@ -251,13 +300,20 @@ export function CustomersView({
 
             {sort !== "recent" ? <input type="hidden" name="sort" value={sort} /> : null}
 
-            <button type="submit" className="btn btn-primary min-h-11 px-4 text-sm">
+            <button
+              type="submit"
+              disabled={isPending}
+              className="btn btn-primary min-h-11 px-4 text-sm"
+            >
               Search
             </button>
 
             {query ? (
               <Link
                 href={buildCustomersHref({ sort })}
+                onClick={(e) =>
+                  handleLinkNavigation(e, buildCustomersHref({ sort }))
+                }
                 className="btn btn-secondary min-h-11 px-3.5 text-sm"
               >
                 Clear
@@ -268,10 +324,12 @@ export function CustomersView({
           <nav aria-label="Sort customers" className="flex flex-wrap items-center gap-1.5">
             {SORT_OPTIONS.map((option) => {
               const selected = sort === option.value;
+              const href = buildCustomersHref({ query, sort: option.value });
               return (
                 <Link
                   key={option.value}
-                  href={buildCustomersHref({ query, sort: option.value })}
+                  href={href}
+                  onClick={(e) => handleLinkNavigation(e, href)}
                   aria-current={selected ? "true" : undefined}
                   className={`inline-flex min-h-10 items-center rounded-control border px-3.5 text-xs font-medium transition-colors ${
                     selected
@@ -292,7 +350,7 @@ export function CustomersView({
           </p>
         ) : null}
 
-        {rows.length === 0 ? (
+        {!isPending && rows.length === 0 ? (
           <div className="mt-6 rounded-control border border-hairline bg-bg px-4 py-10 text-center">
             <p className="text-sm text-ink-2">
               {query
@@ -310,6 +368,7 @@ export function CustomersView({
             tabIndex={0}
             role="region"
             aria-labelledby={captionId}
+            aria-busy={isPending}
             className="mt-4 overflow-x-auto rounded-control border border-hairline bg-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
@@ -339,7 +398,10 @@ export function CustomersView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline">
-                {rows.map((customer) => {
+                {isPending ? (
+                  <CustomersTableRowsSkeleton rows={Math.max(4, Math.min(rows.length || 6, 8))} />
+                ) : (
+                  rows.map((customer) => {
                   const isEditing = editingPhone === customer.phone;
                   const avgOrder =
                     customer.orderCount > 0
@@ -428,7 +490,8 @@ export function CustomersView({
                       </td>
                     </tr>
                   );
-                })}
+                })
+                )}
               </tbody>
             </table>
           </div>
@@ -447,6 +510,12 @@ export function CustomersView({
                   query,
                   sort,
                 })}
+                onClick={(e) =>
+                  handleLinkNavigation(
+                    e,
+                    buildCustomersHref({ page: currentPage - 1, query, sort }),
+                  )
+                }
                 className="btn btn-secondary min-h-10 gap-1 px-3 text-xs"
               >
                 <ChevronLeft size={14} strokeWidth={1.5} aria-hidden />
@@ -474,6 +543,12 @@ export function CustomersView({
                 <Link
                   key={entry}
                   href={buildCustomersHref({ page: entry, query, sort })}
+                  onClick={(e) =>
+                    handleLinkNavigation(
+                      e,
+                      buildCustomersHref({ page: entry, query, sort }),
+                    )
+                  }
                   aria-current={entry === currentPage ? "page" : undefined}
                   className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-control border px-2.5 font-mono text-xs font-medium transition-colors ${
                     entry === currentPage
@@ -493,6 +568,12 @@ export function CustomersView({
                   query,
                   sort,
                 })}
+                onClick={(e) =>
+                  handleLinkNavigation(
+                    e,
+                    buildCustomersHref({ page: currentPage + 1, query, sort }),
+                  )
+                }
                 className="btn btn-secondary min-h-10 gap-1 px-3 text-xs"
               >
                 Next

@@ -31,10 +31,15 @@ export const viewport: Viewport = {
   ],
 };
 
+const themeInitScript = `try{var v=localStorage.getItem("color-scheme");if(v==="light"||v==="dark"){var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=v;}}catch{}`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-      <body>{children}</body>
+      <body>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {children}
+      </body>
     </html>
   );
 }

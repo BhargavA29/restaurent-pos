@@ -2,6 +2,7 @@ import { Flame, LogOut } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { Nav } from "@/components/nav";
 import { OfflineSyncBar } from "@/components/offline-sync-bar";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { requireOwner } from "@/lib/auth";
 import { CAFE_INSTAGRAM, CAFE_NAME } from "@/lib/brand";
 
@@ -26,16 +27,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Nav />
         </div>
 
-        <form action={logout} className="mt-auto hidden md:block">
-          <p className="truncate px-3 pb-2 text-xs text-ink-3">{owner.name}</p>
-          <button
-            type="submit"
-            className="flex min-h-9 w-full items-center gap-2.5 rounded-control px-3 text-sm text-ink-3 transition-colors hover:bg-raised hover:text-ink"
-          >
-            <LogOut size={18} strokeWidth={1.5} aria-hidden />
-            Sign out
-          </button>
-        </form>
+        <div className="mt-auto hidden flex-col gap-1 md:flex">
+          <p className="truncate px-3 pb-1 text-xs text-ink-3">{owner.name}</p>
+          <ThemeToggle />
+          <form action={logout}>
+            <button
+              type="submit"
+              className="flex min-h-9 w-full items-center gap-2.5 rounded-control px-3 text-sm text-ink-3 transition-colors hover:bg-raised hover:text-ink"
+            >
+              <LogOut size={18} strokeWidth={1.5} aria-hidden />
+              Sign out
+            </button>
+          </form>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-col">
@@ -50,15 +54,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
           </div>
 
-          <form action={logout}>
-            <button
-              type="submit"
-              className="flex min-h-11 items-center gap-2 rounded-control px-3 text-sm text-ink-2 transition-colors hover:bg-raised hover:text-ink"
-            >
-              <LogOut size={16} strokeWidth={1.5} aria-hidden />
-              Sign out
-            </button>
-          </form>
+          <div className="flex items-center gap-1">
+            <ThemeToggle compact />
+            <form action={logout}>
+              <button
+                type="submit"
+                className="flex min-h-11 items-center gap-2 rounded-control px-3 text-sm text-ink-2 transition-colors hover:bg-raised hover:text-ink"
+              >
+                <LogOut size={16} strokeWidth={1.5} aria-hidden />
+                Sign out
+              </button>
+            </form>
+          </div>
         </header>
 
         <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-6 md:px-8 md:pb-10 md:pt-8">
