@@ -39,6 +39,7 @@ export default async function MenuPage() {
 
   return (
     <MenuManager
+      key={categoryRows.length === 0 ? "empty" : "seeded"}
       categories={categoryRows}
       items={itemRows}
       variants={variantRows}

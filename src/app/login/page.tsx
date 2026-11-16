@@ -10,7 +10,7 @@ export default function LoginPage() {
     <main className="grid min-h-dvh place-items-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-control bg-accent text-accent-ink">
+          <span className="grid size-10 place-items-center rounded-control bg-accent text-white">
             <Flame size={20} strokeWidth={1.5} aria-hidden />
           </span>
           <div className="leading-tight">

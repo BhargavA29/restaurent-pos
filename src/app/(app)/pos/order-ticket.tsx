@@ -15,6 +15,7 @@ type OrderTicketProps = {
   orderType: OrderType;
   customerName: string;
   customerPhone: string;
+  customerError?: string | null;
   onOrderTypeChange: (type: OrderType) => void;
   onCustomerNameChange: (name: string) => void;
   onCustomerPhoneChange: (phone: string) => void;
@@ -31,6 +32,7 @@ export function OrderTicket({
   orderType,
   customerName,
   customerPhone,
+  customerError = null,
   onOrderTypeChange,
   onCustomerNameChange,
   onCustomerPhoneChange,
@@ -106,6 +108,7 @@ export function OrderTicket({
           <input
             id={nameId}
             type="text"
+            maxLength={80}
             autoComplete="off"
             value={customerName}
             onChange={(e) => onCustomerNameChange(e.target.value)}
@@ -122,14 +125,28 @@ export function OrderTicket({
             id={phoneId}
             type="tel"
             inputMode="numeric"
+            maxLength={14}
             autoComplete="off"
+            aria-invalid={customerError ? "true" : "false"}
             value={customerPhone}
-            onChange={(e) => onCustomerPhoneChange(e.target.value)}
+            onChange={(e) => {
+              const digits = e.target.value
+                .replace(/^\+?91[\s-]?/, "")
+                .replace(/\D/g, "")
+                .slice(0, 10);
+              onCustomerPhoneChange(digits);
+            }}
             placeholder="10-digit number"
             className="field font-mono text-sm"
           />
         </div>
       </div>
+
+      {customerError ? (
+        <p role="alert" className="-mt-2 text-xs text-negative">
+          {customerError}
+        </p>
+      ) : null}
 
       {lines.length === 0 ? (
         <div className="rounded-control border border-dashed border-hairline px-4 py-8 text-center text-sm text-ink-3">

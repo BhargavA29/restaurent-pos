@@ -103,7 +103,7 @@
   --color-ink-3: var(--text-3);
   --color-brand: var(--brand);
   --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
+  --color-accent-ink: #ffffff;
   --color-accent-text: var(--accent-text);
   --color-accent-soft: var(--accent-soft);
   --color-positive: var(--positive);
@@ -119,7 +119,7 @@
 html {
   background: var(--bg);
   color: var(--text);
-  accent-color: var(--accent);
+  accent-color: #d93600;
   /* Follow the OS text size setting. */
   font-size: 100%;
   -webkit-text-size-adjust: 100%;
@@ -183,7 +183,7 @@ body {
   }
   .btn-primary {
     background: var(--accent);
-    color: var(--accent-ink);
+    color: #ffffff;
   }
   .btn-primary:hover:not(:disabled) {
     opacity: 0.92;

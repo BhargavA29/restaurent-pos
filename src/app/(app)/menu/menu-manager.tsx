@@ -1,13 +1,23 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { formatRupees } from "@/lib/format";
+import type { AddonInput, CategoryInput, ComboInput, ItemInput } from "@/lib/validators";
 import {
+  deleteAddon,
+  deleteCategory,
+  deleteCombo,
+  deleteItem,
+  saveAddon,
+  saveCategory,
+  saveCombo,
+  saveItem,
   seedSampleMenu,
   toggleAddonActive,
   toggleComboSoldOut,
   toggleItemSoldOut,
+  type ActionResult,
 } from "./actions";
 import {
   AddonModal,
@@ -22,7 +32,7 @@ import {
   type VariantRow,
 } from "./menu-modals";
 
-type MenuManagerProps = {
+type MenuSnapshot = {
   categories: CategoryRow[];
   items: ItemRow[];
   variants: VariantRow[];
@@ -39,25 +49,26 @@ type ActiveModal =
   | { kind: "combo"; combo: ComboRow | null }
   | null;
 
+function bySortAndName<T extends { sort: number; name: string }>(a: T, b: T) {
+  return a.sort - b.sort || a.name.localeCompare(b.name);
+}
+
 function StatusToggle({
   isPositive,
   positiveLabel,
   negativeLabel,
   useNegativeBorder,
-  pending,
   onToggle,
 }: {
   isPositive: boolean;
   positiveLabel: string;
   negativeLabel: string;
   useNegativeBorder?: boolean;
-  pending: boolean;
   onToggle: () => void;
 }) {
   return (
     <button
       type="button"
-      disabled={pending}
       onClick={onToggle}
       aria-pressed={!isPositive}
       className={`inline-flex min-h-11 items-center gap-2 rounded-control border px-3 text-xs font-medium transition-colors sm:min-h-9 ${
@@ -79,82 +90,282 @@ function StatusToggle({
   );
 }
 
-export function MenuManager({
-  categories,
-  items,
-  variants,
-  addons,
-  itemAddons,
-  combos,
-  comboItems,
-}: MenuManagerProps) {
+export function MenuManager(initial: MenuSnapshot) {
+  const [state, setState] = useState<MenuSnapshot>(initial);
   const [modal, setModal] = useState<ActiveModal>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [seedPending, startSeedTransition] = useTransition();
 
   const variantsByItem = useMemo(() => {
     const map = new Map<string, VariantRow[]>();
-    for (const v of variants) {
+    for (const v of state.variants) {
       const list = map.get(v.itemId) ?? [];
       list.push(v);
       map.set(v.itemId, list);
     }
     return map;
-  }, [variants]);
+  }, [state.variants]);
 
-  const addonMap = useMemo(() => new Map(addons.map((a) => [a.id, a])), [addons]);
-  const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const addonMap = useMemo(
+    () => new Map(state.addons.map((a) => [a.id, a])),
+    [state.addons],
+  );
+  const itemMap = useMemo(() => new Map(state.items.map((i) => [i.id, i])), [state.items]);
 
   const addonIdsByItem = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const link of itemAddons) {
+    for (const link of state.itemAddons) {
       const list = map.get(link.itemId) ?? [];
       list.push(link.addonId);
       map.set(link.itemId, list);
     }
     return map;
-  }, [itemAddons]);
+  }, [state.itemAddons]);
 
   const comboItemsByCombo = useMemo(() => {
     const map = new Map<string, ComboItemRow[]>();
-    for (const ci of comboItems) {
+    for (const ci of state.comboItems) {
       const list = map.get(ci.comboId) ?? [];
       list.push(ci);
       map.set(ci.comboId, list);
     }
     return map;
-  }, [comboItems]);
+  }, [state.comboItems]);
 
   const itemsByCategory = useMemo(() => {
     const map = new Map<string, ItemRow[]>();
-    for (const item of items) {
+    for (const item of state.items) {
       const list = map.get(item.categoryId) ?? [];
       list.push(item);
       map.set(item.categoryId, list);
     }
     return map;
-  }, [items]);
+  }, [state.items]);
 
-  async function runToggle(id: string, fn: () => Promise<unknown>) {
-    setPendingId(id);
-    try {
-      await fn();
-    } finally {
-      setPendingId(null);
-    }
+  function runOptimistic(
+    apply: (prev: MenuSnapshot) => MenuSnapshot,
+    persist: () => Promise<ActionResult>,
+  ) {
+    const prevSnapshot = state;
+    setErrorBanner(null);
+    setModal(null);
+    setState(apply(prevSnapshot));
+    void persist()
+      .then((res) => {
+        if (res.error) {
+          setState(prevSnapshot);
+          setErrorBanner(res.error);
+        }
+      })
+      .catch(() => {
+        setState(prevSnapshot);
+        setErrorBanner("Could not reach the server. Changes were reverted.");
+      });
   }
 
-  const firstCategoryId = categories[0]?.id ?? "";
+  function optimisticToggle(
+    patch: (revert: boolean) => void,
+    persist: () => Promise<ActionResult>,
+  ) {
+    setErrorBanner(null);
+    patch(false);
+    void persist()
+      .then((res) => {
+        if (res.error) {
+          patch(true);
+          setErrorBanner(res.error);
+        }
+      })
+      .catch(() => {
+        patch(true);
+        setErrorBanner("Could not reach the server. Status was reverted.");
+      });
+  }
+
+  function handleSaveCategory(input: CategoryInput) {
+    runOptimistic(
+      (prev) => {
+        const exists = prev.categories.some((c) => c.id === input.id);
+        const nextCategories = (
+          exists
+            ? prev.categories.map((c) => (c.id === input.id ? input : c))
+            : [...prev.categories, input]
+        ).sort(bySortAndName);
+        return { ...prev, categories: nextCategories };
+      },
+      () => saveCategory(input),
+    );
+  }
+
+  function handleDeleteCategory(id: string): ActionResult {
+    if (state.items.some((i) => i.categoryId === id)) {
+      return { error: "Move or delete items in this category first" };
+    }
+    runOptimistic(
+      (prev) => ({
+        ...prev,
+        categories: prev.categories.filter((c) => c.id !== id),
+      }),
+      () => deleteCategory(id),
+    );
+    return {};
+  }
+
+  function handleSaveAddon(input: AddonInput) {
+    runOptimistic(
+      (prev) => {
+        const exists = prev.addons.some((a) => a.id === input.id);
+        const nextAddons = (
+          exists
+            ? prev.addons.map((a) => (a.id === input.id ? input : a))
+            : [...prev.addons, input]
+        ).sort((a, b) => a.name.localeCompare(b.name));
+        return { ...prev, addons: nextAddons };
+      },
+      () => saveAddon(input),
+    );
+  }
+
+  function handleDeleteAddon(id: string) {
+    runOptimistic(
+      (prev) => ({
+        ...prev,
+        addons: prev.addons.filter((a) => a.id !== id),
+        itemAddons: prev.itemAddons.filter((l) => l.addonId !== id),
+      }),
+      () => deleteAddon(id),
+    );
+  }
+
+  function handleSaveItem(input: ItemInput) {
+    runOptimistic(
+      (prev) => {
+        const existing = prev.items.find((i) => i.id === input.id);
+        const itemRow: ItemRow = {
+          id: input.id,
+          categoryId: input.categoryId,
+          name: input.name,
+          price: input.price,
+          active: input.active,
+          soldOut: input.soldOut,
+          sort: existing?.sort ?? 0,
+        };
+        const nextItems = (
+          existing
+            ? prev.items.map((i) => (i.id === input.id ? itemRow : i))
+            : [...prev.items, itemRow]
+        ).sort(bySortAndName);
+
+        const nextVariants = [
+          ...prev.variants.filter((v) => v.itemId !== input.id),
+          ...input.variants,
+        ];
+        const uniqueAddons = Array.from(new Set(input.addonIds));
+        const nextItemAddons = [
+          ...prev.itemAddons.filter((l) => l.itemId !== input.id),
+          ...uniqueAddons.map((addonId) => ({ itemId: input.id, addonId })),
+        ];
+
+        return {
+          ...prev,
+          items: nextItems,
+          variants: nextVariants,
+          itemAddons: nextItemAddons,
+        };
+      },
+      () => saveItem(input),
+    );
+  }
+
+  function handleDeleteItem(id: string) {
+    runOptimistic(
+      (prev) => ({
+        ...prev,
+        items: prev.items.filter((i) => i.id !== id),
+        variants: prev.variants.filter((v) => v.itemId !== id),
+        itemAddons: prev.itemAddons.filter((l) => l.itemId !== id),
+        comboItems: prev.comboItems.filter((ci) => ci.itemId !== id),
+      }),
+      () => deleteItem(id),
+    );
+  }
+
+  function handleSaveCombo(input: ComboInput) {
+    runOptimistic(
+      (prev) => {
+        const existing = prev.combos.find((c) => c.id === input.id);
+        const comboRow: ComboRow = {
+          id: input.id,
+          name: input.name,
+          price: input.price,
+          active: input.active,
+          soldOut: input.soldOut,
+          sort: existing?.sort ?? 0,
+        };
+        const nextCombos = (
+          existing
+            ? prev.combos.map((c) => (c.id === input.id ? comboRow : c))
+            : [...prev.combos, comboRow]
+        ).sort(bySortAndName);
+
+        const merged = new Map<string, number>();
+        for (const row of input.items) {
+          merged.set(row.itemId, (merged.get(row.itemId) ?? 0) + row.qty);
+        }
+        const nextComboItems = [
+          ...prev.comboItems.filter((ci) => ci.comboId !== input.id),
+          ...Array.from(merged.entries()).map(([itemId, qty]) => ({
+            comboId: input.id,
+            itemId,
+            qty,
+          })),
+        ];
+
+        return { ...prev, combos: nextCombos, comboItems: nextComboItems };
+      },
+      () => saveCombo(input),
+    );
+  }
+
+  function handleDeleteCombo(id: string) {
+    runOptimistic(
+      (prev) => ({
+        ...prev,
+        combos: prev.combos.filter((c) => c.id !== id),
+        comboItems: prev.comboItems.filter((ci) => ci.comboId !== id),
+      }),
+      () => deleteCombo(id),
+    );
+  }
+
+  const firstCategoryId = state.categories[0]?.id ?? "";
 
   return (
     <div className="flex flex-col gap-8">
+      {errorBanner ? (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-card border border-negative/40 bg-negative/10 px-4 py-3 text-sm text-negative"
+        >
+          <span>{errorBanner}</span>
+          <button
+            type="button"
+            aria-label="Dismiss error"
+            onClick={() => setErrorBanner(null)}
+            className="grid size-8 shrink-0 place-items-center rounded-lg hover:bg-negative/15"
+          >
+            <X size={16} strokeWidth={1.5} aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-normal leading-tight">Menu</h1>
           <p className="mt-1 font-mono text-sm text-ink-2">
-            {items.length} {items.length === 1 ? "item" : "items"},{" "}
-            {combos.length} {combos.length === 1 ? "combo" : "combos"},{" "}
-            {addons.length} {addons.length === 1 ? "add-on" : "add-ons"}
+            {state.items.length} {state.items.length === 1 ? "item" : "items"},{" "}
+            {state.combos.length} {state.combos.length === 1 ? "combo" : "combos"},{" "}
+            {state.addons.length} {state.addons.length === 1 ? "add-on" : "add-ons"}
           </p>
         </div>
 
@@ -194,7 +405,7 @@ export function MenuManager({
         </div>
       </header>
 
-      {categories.length === 0 ? (
+      {state.categories.length === 0 ? (
         <section className="rounded-card border border-hairline bg-card p-6 md:p-8">
           <h2 className="text-lg font-medium">No menu items yet</h2>
           <p className="mt-1.5 max-w-xl text-sm text-ink-2">
@@ -221,7 +432,7 @@ export function MenuManager({
         </section>
       ) : (
         <div className="flex flex-col gap-8">
-          {categories.map((cat) => {
+          {state.categories.map((cat) => {
             const catItems = itemsByCategory.get(cat.id) ?? [];
             return (
               <section key={cat.id} className="flex flex-col gap-3">
@@ -321,12 +532,21 @@ export function MenuManager({
                                 positiveLabel="In stock"
                                 negativeLabel="Sold out"
                                 useNegativeBorder
-                                pending={pendingId === item.id}
-                                onToggle={() =>
-                                  void runToggle(item.id, () =>
-                                    toggleItemSoldOut(item.id, !item.soldOut),
-                                  )
-                                }
+                                onToggle={() => {
+                                  const next = !item.soldOut;
+                                  optimisticToggle(
+                                    (revert) =>
+                                      setState((prev) => ({
+                                        ...prev,
+                                        items: prev.items.map((i) =>
+                                          i.id === item.id
+                                            ? { ...i, soldOut: revert ? item.soldOut : next }
+                                            : i,
+                                        ),
+                                      })),
+                                    () => toggleItemSoldOut(item.id, next),
+                                  );
+                                }}
                               />
                               <button
                                 type="button"
@@ -358,7 +578,7 @@ export function MenuManager({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-baseline gap-2.5">
             <h2 className="text-base font-medium">Combos</h2>
-            <span className="font-mono text-xs text-ink-3">{combos.length}</span>
+            <span className="font-mono text-xs text-ink-3">{state.combos.length}</span>
           </div>
           <button
             type="button"
@@ -370,13 +590,13 @@ export function MenuManager({
           </button>
         </div>
 
-        {combos.length === 0 ? (
+        {state.combos.length === 0 ? (
           <div className="rounded-card border border-hairline bg-card px-4 py-4 text-sm text-ink-3">
             No combos created yet
           </div>
         ) : (
           <ul className="divide-y divide-hairline rounded-card border border-hairline bg-card">
-            {combos.map((combo) => {
+            {state.combos.map((combo) => {
               const members = (comboItemsByCombo.get(combo.id) ?? [])
                 .map((ci) => {
                   const item = itemMap.get(ci.itemId);
@@ -411,12 +631,21 @@ export function MenuManager({
                         positiveLabel="In stock"
                         negativeLabel="Sold out"
                         useNegativeBorder
-                        pending={pendingId === combo.id}
-                        onToggle={() =>
-                          void runToggle(combo.id, () =>
-                            toggleComboSoldOut(combo.id, !combo.soldOut),
-                          )
-                        }
+                        onToggle={() => {
+                          const next = !combo.soldOut;
+                          optimisticToggle(
+                            (revert) =>
+                              setState((prev) => ({
+                                ...prev,
+                                combos: prev.combos.map((c) =>
+                                  c.id === combo.id
+                                    ? { ...c, soldOut: revert ? combo.soldOut : next }
+                                    : c,
+                                ),
+                              })),
+                            () => toggleComboSoldOut(combo.id, next),
+                          );
+                        }}
                       />
                       <button
                         type="button"
@@ -438,7 +667,7 @@ export function MenuManager({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-baseline gap-2.5">
             <h2 className="text-base font-medium">Add-ons</h2>
-            <span className="font-mono text-xs text-ink-3">{addons.length}</span>
+            <span className="font-mono text-xs text-ink-3">{state.addons.length}</span>
           </div>
           <button
             type="button"
@@ -450,13 +679,13 @@ export function MenuManager({
           </button>
         </div>
 
-        {addons.length === 0 ? (
+        {state.addons.length === 0 ? (
           <div className="rounded-card border border-hairline bg-card px-4 py-4 text-sm text-ink-3">
             No add-ons created yet
           </div>
         ) : (
           <ul className="divide-y divide-hairline rounded-card border border-hairline bg-card">
-            {addons.map((addon) => (
+            {state.addons.map((addon) => (
               <li
                 key={addon.id}
                 className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5"
@@ -472,12 +701,21 @@ export function MenuManager({
                       isPositive={addon.active}
                       positiveLabel="Active"
                       negativeLabel="Hidden"
-                      pending={pendingId === addon.id}
-                      onToggle={() =>
-                        void runToggle(addon.id, () =>
-                          toggleAddonActive(addon.id, !addon.active),
-                        )
-                      }
+                      onToggle={() => {
+                        const next = !addon.active;
+                        optimisticToggle(
+                          (revert) =>
+                            setState((prev) => ({
+                              ...prev,
+                              addons: prev.addons.map((a) =>
+                                a.id === addon.id
+                                  ? { ...a, active: revert ? addon.active : next }
+                                  : a,
+                              ),
+                            })),
+                          () => toggleAddonActive(addon.id, next),
+                        );
+                      }}
                     />
                     <button
                       type="button"
@@ -497,13 +735,17 @@ export function MenuManager({
       <CategoryModal
         open={modal?.kind === "category"}
         category={modal?.kind === "category" ? modal.category : null}
-        nextSort={categories.length}
+        nextSort={state.categories.length}
+        onSave={handleSaveCategory}
+        onDelete={handleDeleteCategory}
         onClose={() => setModal(null)}
       />
 
       <AddonModal
         open={modal?.kind === "addon"}
         addon={modal?.kind === "addon" ? modal.addon : null}
+        onSave={handleSaveAddon}
+        onDelete={handleDeleteAddon}
         onClose={() => setModal(null)}
       />
 
@@ -513,30 +755,34 @@ export function MenuManager({
         defaultCategoryId={
           modal?.kind === "item" ? modal.defaultCategoryId : firstCategoryId
         }
-        categories={categories}
+        categories={state.categories}
         variants={
           modal?.kind === "item" && modal.item
             ? variantsByItem.get(modal.item.id) ?? []
             : []
         }
-        addons={addons}
+        addons={state.addons}
         selectedAddonIds={
           modal?.kind === "item" && modal.item
             ? addonIdsByItem.get(modal.item.id) ?? []
             : []
         }
+        onSave={handleSaveItem}
+        onDelete={handleDeleteItem}
         onClose={() => setModal(null)}
       />
 
       <ComboModal
         open={modal?.kind === "combo"}
         combo={modal?.kind === "combo" ? modal.combo : null}
-        items={items}
+        items={state.items}
         comboItems={
           modal?.kind === "combo" && modal.combo
             ? comboItemsByCombo.get(modal.combo.id) ?? []
             : []
         }
+        onSave={handleSaveCombo}
+        onDelete={handleDeleteCombo}
         onClose={() => setModal(null)}
       />
     </div>

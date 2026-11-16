@@ -12,6 +12,7 @@ import {
   type OrderType,
 } from "@/lib/cart";
 import { formatRupees } from "@/lib/format";
+import { customerInfoSchema } from "@/lib/validators";
 import { CustomizeItemModal, type PosItem } from "./customize-modal";
 import { OrderTicket } from "./order-ticket";
 
@@ -39,6 +40,7 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
   const [orderType, setOrderType] = useState<OrderType>("takeaway");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerError, setCustomerError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -171,7 +173,21 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
     setLines([]);
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerError(null);
     setMobileCartOpen(false);
+  }
+
+  function handleCharge() {
+    const parsed = customerInfoSchema.safeParse({ customerName, customerPhone });
+    if (!parsed.success) {
+      setCustomerError(parsed.error.issues[0]?.message ?? "Check customer details");
+      return;
+    }
+    setCustomerName(parsed.data.customerName);
+    setCustomerPhone(parsed.data.customerPhone);
+    setCustomerError(null);
+    setMobileCartOpen(false);
+    setChargePreviewOpen(true);
   }
 
   const totals = computeCartTotals(lines);
@@ -240,7 +256,7 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
                       onClick={() => setActiveTab(tab.id)}
                       className={`min-h-11 shrink-0 rounded-control border px-4 text-sm font-medium transition-colors ${
                         selected
-                          ? "border-accent bg-accent text-accent-ink"
+                          ? "border-accent bg-accent text-white"
                           : "border-hairline bg-card text-ink-2 hover:border-ink-3 hover:text-ink"
                       }`}
                     >
@@ -276,7 +292,7 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
                             </span>
                           </div>
                           {countInCart > 0 ? (
-                            <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-accent-ink">
+                            <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
                               {countInCart}
                             </span>
                           ) : null}
@@ -319,7 +335,7 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
                         <div className="flex w-full items-start justify-between gap-2">
                           <span className="font-medium leading-snug text-ink">{item.name}</span>
                           {countInCart > 0 ? (
-                            <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-accent-ink">
+                            <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-mono text-xs font-medium text-white">
                               {countInCart}
                             </span>
                           ) : null}
@@ -357,14 +373,21 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
             orderType={orderType}
             customerName={customerName}
             customerPhone={customerPhone}
+            customerError={customerError}
             onOrderTypeChange={setOrderType}
-            onCustomerNameChange={setCustomerName}
-            onCustomerPhoneChange={setCustomerPhone}
+            onCustomerNameChange={(v) => {
+              setCustomerName(v);
+              if (customerError) setCustomerError(null);
+            }}
+            onCustomerPhoneChange={(v) => {
+              setCustomerPhone(v);
+              if (customerError) setCustomerError(null);
+            }}
             onUpdateQty={updateQty}
             onSetDiscount={setDiscount}
             onToggleComplimentary={toggleComplimentary}
             onClearCart={clearCart}
-            onCharge={() => setChargePreviewOpen(true)}
+            onCharge={handleCharge}
           />
         </aside>
       </div>
@@ -374,7 +397,7 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
           <button
             type="button"
             onClick={() => setMobileCartOpen(true)}
-            className="flex min-h-14 w-full items-center justify-between gap-3 rounded-card bg-accent px-4 py-3 text-accent-ink shadow-[0_8px_24px_rgb(0_0_0/0.2)] transition-transform active:scale-[0.99]"
+            className="flex min-h-14 w-full items-center justify-between gap-3 rounded-card bg-accent px-4 py-3 text-white shadow-[0_8px_24px_rgb(0_0_0/0.2)] transition-transform active:scale-[0.99]"
           >
             <span className="flex items-center gap-2.5 text-sm font-medium">
               <ShoppingBag size={18} strokeWidth={1.5} aria-hidden />
@@ -402,17 +425,21 @@ export function PosTerminal({ categories, items, combos }: PosTerminalProps) {
           orderType={orderType}
           customerName={customerName}
           customerPhone={customerPhone}
+          customerError={customerError}
           onOrderTypeChange={setOrderType}
-          onCustomerNameChange={setCustomerName}
-          onCustomerPhoneChange={setCustomerPhone}
+          onCustomerNameChange={(v) => {
+            setCustomerName(v);
+            if (customerError) setCustomerError(null);
+          }}
+          onCustomerPhoneChange={(v) => {
+            setCustomerPhone(v);
+            if (customerError) setCustomerError(null);
+          }}
           onUpdateQty={updateQty}
           onSetDiscount={setDiscount}
           onToggleComplimentary={toggleComplimentary}
           onClearCart={clearCart}
-          onCharge={() => {
-            setMobileCartOpen(false);
-            setChargePreviewOpen(true);
-          }}
+          onCharge={handleCharge}
         />
       </Modal>
 

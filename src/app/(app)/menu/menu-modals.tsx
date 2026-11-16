@@ -1,22 +1,24 @@
 "use client";
 
 import { Minus, Plus, Trash2 } from "lucide-react";
-import { useId, useState, useTransition } from "react";
+import { useId, useState } from "react";
 import { Modal } from "@/components/modal";
 import { formatRupees } from "@/lib/format";
 import {
-  deleteAddon,
-  deleteCategory,
-  deleteCombo,
-  deleteItem,
-  saveAddon,
-  saveCategory,
-  saveCombo,
-  saveItem,
-  type ActionResult,
-} from "./actions";
+  addonSchema,
+  categorySchema,
+  comboSchema,
+  itemSchema,
+  parseRupeesInput,
+  type AddonInput,
+  type CategoryInput,
+  type ComboInput,
+  type ItemInput,
+  type VariantInput,
+} from "@/lib/validators";
+import type { ActionResult } from "./actions";
 
-export type CategoryRow = { id: string; name: string; sort: number; active: boolean };
+export type CategoryRow = CategoryInput;
 export type ItemRow = {
   id: string;
   categoryId: string;
@@ -26,8 +28,8 @@ export type ItemRow = {
   active: boolean;
   sort: number;
 };
-export type VariantRow = { id: string; itemId: string; name: string; price: number; sort: number };
-export type AddonRow = { id: string; name: string; price: number; active: boolean };
+export type VariantRow = VariantInput;
+export type AddonRow = AddonInput;
 export type ComboRow = {
   id: string;
   name: string;
@@ -40,13 +42,12 @@ export type ComboItemRow = { comboId: string; itemId: string; qty: number };
 
 type ModalFooterProps = {
   isEditing: boolean;
-  pending: boolean;
   error: string | null;
   onCancel: () => void;
-  onDelete?: () => Promise<ActionResult>;
+  onDelete?: () => ActionResult | void;
 };
 
-function ModalFooter({ isEditing, pending, error, onCancel, onDelete }: ModalFooterProps) {
+function ModalFooter({ isEditing, error, onCancel, onDelete }: ModalFooterProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
@@ -61,13 +62,12 @@ function ModalFooter({ isEditing, pending, error, onCancel, onDelete }: ModalFoo
         {isEditing && onDelete ? (
           <button
             type="button"
-            disabled={pending}
             onClick={() => {
               if (!confirmDelete) {
                 setConfirmDelete(true);
                 return;
               }
-              void onDelete();
+              onDelete();
             }}
             className="btn btn-danger px-4 text-sm"
           >
@@ -82,8 +82,8 @@ function ModalFooter({ isEditing, pending, error, onCancel, onDelete }: ModalFoo
           <button type="button" onClick={onCancel} className="btn btn-secondary px-4 text-sm">
             Cancel
           </button>
-          <button type="submit" disabled={pending} className="btn btn-primary px-5 text-sm">
-            {pending ? "Saving" : "Save"}
+          <button type="submit" className="btn btn-primary px-5 text-sm">
+            Save
           </button>
         </div>
       </div>
@@ -94,41 +94,44 @@ function ModalFooter({ isEditing, pending, error, onCancel, onDelete }: ModalFoo
 function CategoryForm({
   category,
   nextSort,
+  onSave,
+  onDelete,
   onClose,
 }: {
   category: CategoryRow | null;
   nextSort: number;
+  onSave: (data: CategoryInput) => void;
+  onDelete: (id: string) => ActionResult;
   onClose: () => void;
 }) {
   const nameId = useId();
   const sortId = useId();
+  const [id] = useState(() => category?.id ?? crypto.randomUUID());
   const [name, setName] = useState(category?.name ?? "");
   const [sort, setSort] = useState(String(category?.sort ?? nextSort));
   const [active, setActive] = useState(category?.active ?? true);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    startTransition(async () => {
-      const res = await saveCategory({
-        id: category?.id,
-        name,
-        sort: Number.parseInt(sort, 10) || 0,
-        active,
-      });
-      if (res.error) setError(res.error);
-      else onClose();
+    const parsed = categorySchema.safeParse({
+      id,
+      name,
+      sort: parseRupeesInput(sort),
+      active,
     });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Check category details");
+      return;
+    }
+    setError(null);
+    onSave(parsed.data);
   }
 
-  async function handleDelete(): Promise<ActionResult> {
+  function handleDelete(): ActionResult {
     if (!category) return {};
-    setError(null);
-    const res = await deleteCategory(category.id);
+    const res = onDelete(category.id);
     if (res.error) setError(res.error);
-    else onClose();
     return res;
   }
 
@@ -144,6 +147,7 @@ function CategoryForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Signature Fries"
+          maxLength={60}
           required
           autoFocus
           className="field"
@@ -159,8 +163,10 @@ function CategoryForm({
           type="number"
           inputMode="numeric"
           min={0}
+          max={999}
           value={sort}
           onChange={(e) => setSort(e.target.value)}
+          required
           className="field font-mono"
         />
       </div>
@@ -177,7 +183,6 @@ function CategoryForm({
 
       <ModalFooter
         isEditing={Boolean(category)}
-        pending={pending}
         error={error}
         onCancel={onClose}
         onDelete={category ? handleDelete : undefined}
@@ -190,11 +195,15 @@ export function CategoryModal({
   open,
   category,
   nextSort,
+  onSave,
+  onDelete,
   onClose,
 }: {
   open: boolean;
   category: CategoryRow | null;
   nextSort: number;
+  onSave: (data: CategoryInput) => void;
+  onDelete: (id: string) => ActionResult;
   onClose: () => void;
 }) {
   const titleId = useId();
@@ -209,43 +218,47 @@ export function CategoryModal({
         key={category?.id ?? "new-category"}
         category={category}
         nextSort={nextSort}
+        onSave={onSave}
+        onDelete={onDelete}
         onClose={onClose}
       />
     </Modal>
   );
 }
 
-function AddonForm({ addon, onClose }: { addon: AddonRow | null; onClose: () => void }) {
+function AddonForm({
+  addon,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  addon: AddonRow | null;
+  onSave: (data: AddonInput) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+}) {
   const nameId = useId();
   const priceId = useId();
+  const [id] = useState(() => addon?.id ?? crypto.randomUUID());
   const [name, setName] = useState(addon?.name ?? "");
   const [price, setPrice] = useState(addon ? String(addon.price) : "");
   const [active, setActive] = useState(addon?.active ?? true);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    startTransition(async () => {
-      const res = await saveAddon({
-        id: addon?.id,
-        name,
-        price: Number.parseInt(price, 10) || 0,
-        active,
-      });
-      if (res.error) setError(res.error);
-      else onClose();
+    const parsed = addonSchema.safeParse({
+      id,
+      name,
+      price: parseRupeesInput(price),
+      active,
     });
-  }
-
-  async function handleDelete(): Promise<ActionResult> {
-    if (!addon) return {};
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Check add-on details");
+      return;
+    }
     setError(null);
-    const res = await deleteAddon(addon.id);
-    if (res.error) setError(res.error);
-    else onClose();
-    return res;
+    onSave(parsed.data);
   }
 
   return (
@@ -260,6 +273,7 @@ function AddonForm({ addon, onClose }: { addon: AddonRow | null; onClose: () => 
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Peri-Peri Dust"
+          maxLength={60}
           required
           autoFocus
           className="field"
@@ -275,6 +289,7 @@ function AddonForm({ addon, onClose }: { addon: AddonRow | null; onClose: () => 
           type="number"
           inputMode="numeric"
           min={0}
+          max={100000}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="20"
@@ -295,10 +310,9 @@ function AddonForm({ addon, onClose }: { addon: AddonRow | null; onClose: () => 
 
       <ModalFooter
         isEditing={Boolean(addon)}
-        pending={pending}
         error={error}
         onCancel={onClose}
-        onDelete={addon ? handleDelete : undefined}
+        onDelete={addon ? () => onDelete(addon.id) : undefined}
       />
     </form>
   );
@@ -307,10 +321,14 @@ function AddonForm({ addon, onClose }: { addon: AddonRow | null; onClose: () => 
 export function AddonModal({
   open,
   addon,
+  onSave,
+  onDelete,
   onClose,
 }: {
   open: boolean;
   addon: AddonRow | null;
+  onSave: (data: AddonInput) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const titleId = useId();
@@ -321,7 +339,13 @@ export function AddonModal({
       titleId={titleId}
       title={addon ? "Edit add-on" : "New add-on"}
     >
-      <AddonForm key={addon?.id ?? "new-addon"} addon={addon} onClose={onClose} />
+      <AddonForm
+        key={addon?.id ?? "new-addon"}
+        addon={addon}
+        onSave={onSave}
+        onDelete={onDelete}
+        onClose={onClose}
+      />
     </Modal>
   );
 }
@@ -333,6 +357,8 @@ function ItemForm({
   variants,
   addons,
   selectedAddonIds,
+  onSave,
+  onDelete,
   onClose,
 }: {
   item: ItemRow | null;
@@ -341,12 +367,15 @@ function ItemForm({
   variants: VariantRow[];
   addons: AddonRow[];
   selectedAddonIds: string[];
+  onSave: (data: ItemInput) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const nameId = useId();
   const catId = useId();
   const priceId = useId();
 
+  const [itemId] = useState(() => item?.id ?? crypto.randomUUID());
   const [name, setName] = useState(item?.name ?? "");
   const [categoryId, setCategoryId] = useState(
     item?.categoryId ?? defaultCategoryId ?? categories[0]?.id ?? "",
@@ -354,12 +383,11 @@ function ItemForm({
   const [price, setPrice] = useState(item ? String(item.price) : "");
   const [active, setActive] = useState(item?.active ?? true);
   const [soldOut] = useState(item?.soldOut ?? false);
-  const [variantRows, setVariantRows] = useState<{ name: string; price: string }[]>(
-    variants.map((v) => ({ name: v.name, price: String(v.price) })),
-  );
+  const [variantRows, setVariantRows] = useState<
+    { id: string; name: string; price: string }[]
+  >(() => variants.map((v) => ({ id: v.id, name: v.name, price: String(v.price) })));
   const [addonIds, setAddonIds] = useState<string[]>(selectedAddonIds);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   function toggleAddon(id: string) {
     setAddonIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -367,35 +395,48 @@ function ItemForm({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
 
-    const parsedVariants = variantRows
-      .filter((v) => v.name.trim().length > 0)
-      .map((v) => ({ name: v.name.trim(), price: Number.parseInt(v.price, 10) || 0 }));
+    const parsedVariants = variantRows.map((row, idx) => ({
+      id: row.id,
+      itemId,
+      name: row.name,
+      price: parseRupeesInput(row.price),
+      sort: idx,
+    }));
 
-    startTransition(async () => {
-      const res = await saveItem({
-        id: item?.id,
-        categoryId,
-        name,
-        price: Number.parseInt(price, 10) || 0,
-        active,
-        soldOut,
-        variants: parsedVariants,
-        addonIds,
-      });
-      if (res.error) setError(res.error);
-      else onClose();
+    const basePriceInput =
+      parsedVariants.length > 0 && price.trim() === ""
+        ? Math.min(
+            ...parsedVariants.map((v) => (Number.isFinite(v.price) ? v.price : 0)),
+          )
+        : parseRupeesInput(price);
+
+    const parsed = itemSchema.safeParse({
+      id: itemId,
+      categoryId,
+      name,
+      price: basePriceInput,
+      active,
+      soldOut,
+      variants: parsedVariants,
+      addonIds,
     });
-  }
 
-  async function handleDelete(): Promise<ActionResult> {
-    if (!item) return {};
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Check item details");
+      return;
+    }
+
+    const normalized: ItemInput = {
+      ...parsed.data,
+      price:
+        parsed.data.variants.length > 0 && parsed.data.price === 0
+          ? Math.min(...parsed.data.variants.map((v) => v.price))
+          : parsed.data.price,
+    };
+
     setError(null);
-    const res = await deleteItem(item.id);
-    if (res.error) setError(res.error);
-    else onClose();
-    return res;
+    onSave(normalized);
   }
 
   return (
@@ -410,6 +451,7 @@ function ItemForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Peri-Peri Crinkle Fries"
+          maxLength={80}
           required
           autoFocus
           className="field"
@@ -444,6 +486,7 @@ function ItemForm({
             type="number"
             inputMode="numeric"
             min={0}
+            max={100000}
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="119"
@@ -462,6 +505,7 @@ function ItemForm({
               setVariantRows((prev) => [
                 ...prev,
                 {
+                  id: crypto.randomUUID(),
                   name: prev.length === 0 ? "Regular" : prev.length === 1 ? "Large" : "",
                   price: "",
                 },
@@ -477,11 +521,13 @@ function ItemForm({
         {variantRows.length > 0 ? (
           <div className="flex flex-col gap-2">
             {variantRows.map((row, idx) => (
-              <div key={idx} className="flex items-center gap-2">
+              <div key={row.id} className="flex items-center gap-2">
                 <input
                   type="text"
                   aria-label={`Variation ${idx + 1} name`}
                   placeholder="Regular"
+                  maxLength={40}
+                  required
                   value={row.name}
                   onChange={(e) =>
                     setVariantRows((prev) =>
@@ -494,8 +540,10 @@ function ItemForm({
                   type="number"
                   inputMode="numeric"
                   min={0}
+                  max={100000}
                   aria-label={`Variation ${idx + 1} price in rupees`}
                   placeholder="119"
+                  required
                   value={row.price}
                   onChange={(e) =>
                     setVariantRows((prev) =>
@@ -563,10 +611,9 @@ function ItemForm({
 
       <ModalFooter
         isEditing={Boolean(item)}
-        pending={pending}
         error={error}
         onCancel={onClose}
-        onDelete={item ? handleDelete : undefined}
+        onDelete={item ? () => onDelete(item.id) : undefined}
       />
     </form>
   );
@@ -580,6 +627,8 @@ export function ItemModal({
   variants,
   addons,
   selectedAddonIds,
+  onSave,
+  onDelete,
   onClose,
 }: {
   open: boolean;
@@ -589,6 +638,8 @@ export function ItemModal({
   variants: VariantRow[];
   addons: AddonRow[];
   selectedAddonIds: string[];
+  onSave: (data: ItemInput) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const titleId = useId();
@@ -607,6 +658,8 @@ export function ItemModal({
         variants={variants}
         addons={addons}
         selectedAddonIds={selectedAddonIds}
+        onSave={onSave}
+        onDelete={onDelete}
         onClose={onClose}
       />
     </Modal>
@@ -617,16 +670,21 @@ function ComboForm({
   combo,
   items,
   comboItems,
+  onSave,
+  onDelete,
   onClose,
 }: {
   combo: ComboRow | null;
   items: ItemRow[];
   comboItems: ComboItemRow[];
+  onSave: (data: ComboInput) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const nameId = useId();
   const priceId = useId();
 
+  const [id] = useState(() => combo?.id ?? crypto.randomUUID());
   const [name, setName] = useState(combo?.name ?? "");
   const [price, setPrice] = useState(combo ? String(combo.price) : "");
   const [active, setActive] = useState(combo?.active ?? true);
@@ -637,11 +695,10 @@ function ComboForm({
     return map;
   });
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   function adjustQty(itemId: string, delta: number) {
     setQtyByItem((prev) => {
-      const next = Math.max(0, (prev[itemId] ?? 0) + delta);
+      const next = Math.max(0, Math.min(50, (prev[itemId] ?? 0) + delta));
       if (next === 0) {
         const copy = { ...prev };
         delete copy[itemId];
@@ -653,32 +710,24 @@ function ComboForm({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     const chosen = Object.entries(qtyByItem)
       .filter(([, qty]) => qty > 0)
       .map(([itemId, qty]) => ({ itemId, qty }));
 
-    startTransition(async () => {
-      const res = await saveCombo({
-        id: combo?.id,
-        name,
-        price: Number.parseInt(price, 10) || 0,
-        active,
-        soldOut,
-        items: chosen,
-      });
-      if (res.error) setError(res.error);
-      else onClose();
+    const parsed = comboSchema.safeParse({
+      id,
+      name,
+      price: parseRupeesInput(price),
+      active,
+      soldOut,
+      items: chosen,
     });
-  }
-
-  async function handleDelete(): Promise<ActionResult> {
-    if (!combo) return {};
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Check combo details");
+      return;
+    }
     setError(null);
-    const res = await deleteCombo(combo.id);
-    if (res.error) setError(res.error);
-    else onClose();
-    return res;
+    onSave(parsed.data);
   }
 
   return (
@@ -693,6 +742,7 @@ function ComboForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Eat Fry Repeat Meal"
+          maxLength={80}
           required
           autoFocus
           className="field"
@@ -708,6 +758,7 @@ function ComboForm({
           type="number"
           inputMode="numeric"
           min={0}
+          max={100000}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="269"
@@ -769,10 +820,9 @@ function ComboForm({
 
       <ModalFooter
         isEditing={Boolean(combo)}
-        pending={pending}
         error={error}
         onCancel={onClose}
-        onDelete={combo ? handleDelete : undefined}
+        onDelete={combo ? () => onDelete(combo.id) : undefined}
       />
     </form>
   );
@@ -783,12 +833,16 @@ export function ComboModal({
   combo,
   items,
   comboItems,
+  onSave,
+  onDelete,
   onClose,
 }: {
   open: boolean;
   combo: ComboRow | null;
   items: ItemRow[];
   comboItems: ComboItemRow[];
+  onSave: (data: ComboInput) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const titleId = useId();
@@ -804,6 +858,8 @@ export function ComboModal({
         combo={combo}
         items={items}
         comboItems={comboItems}
+        onSave={onSave}
+        onDelete={onDelete}
         onClose={onClose}
       />
     </Modal>
